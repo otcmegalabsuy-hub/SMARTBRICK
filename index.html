@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SmartBrick</title>
+<meta name="description" content="SmartBrick · asistente de visita de farmacias de Megalabs">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#007C6B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SmartBrick">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: app por pantallas (login -> inicio -> farmacia -> marcas), columna centrada de hasta 560px; aspecto claro fijo según las referencias */
+:root{
+  color-scheme:light;
+  --bg:#EEF1F3; --surface:#FFFFFF; --ink:#151A18; --muted:#5B6461; --line:#D3DAD8; --edge:#4A504E;
+  --green-900:#174F3A; --green-700:#1F6A47; --green-600:#1E8550; --green-item:#195A3C; --green-line:#4A9A74;
+  --slate:#007C6B; --mode-on:#00B394;
+  --orange:#C4501E; --chip:#6B726F;
+  --up:#16803C; --down:#C2410C;
+  --alta-bg:#5E2116; --alta-fg:#FF9D7A; --media-bg:#4B3B0E; --media-fg:#F4C552; --ok-bg:#174F3A; --ok-fg:#9EE6BF;
+  --brand:#1F7A4F; --brand-strong:#174F3A; --brand-soft:#E3F1EA; --on-brand:#FFFFFF;
+  --series-prev:#A9B5B0; --series-zone:#2F6DB0; --series-grp:#6DB08F;
+  --alta:#B4400C; --alta-soft:#FBE7DD; --media:#7A5300; --media-soft:#FAF0D6; --ok:#16803C; --ok-soft:#E3F1EA;
+  --grupo:#5B6461; --surface-2:#F5F7F7;
+  --font:'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--green-600);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;font-weight:700;text-wrap:balance}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.screen{min-height:100vh;display:flex;flex-direction:column}
+.screen > .grow{flex:1}
+.powered{display:flex;align-items:center;justify-content:center;gap:6px;padding:14px 16px;font-size:13px;color:var(--ink);background:#E3E7E8;margin-top:28px}
+.powered b{color:var(--green-700);font-weight:700}
+.powered svg{color:var(--green-700)}
+
+/* 1 · Login */
+.login{align-items:center;padding-inline:16px;background:radial-gradient(1200px 500px at 50% -10%, #F7F9FA, var(--bg))}
+.login .grow{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;padding-top:48px}
+.login-logo{height:58px;width:auto}
+.welcome{font-size:18px;font-weight:500;text-align:center;line-height:1.35;margin:22px 0 40px}
+.lcard{width:100%;background:var(--surface);border-radius:10px;box-shadow:0 6px 24px rgba(20,30,26,.12),0 1px 3px rgba(20,30,26,.08);padding:14px 12px 12px;display:flex;flex-direction:column;gap:10px}
+.fld{position:relative;display:flex;align-items:center;border:1px solid #BFC7C5;border-radius:6px;height:44px;padding:0 10px;gap:8px;background:var(--surface)}
+.fld:focus-within{border-color:var(--green-700);box-shadow:0 0 0 1px var(--green-700)}
+.fld svg{flex-shrink:0;color:#6B726F}
+.fld input{border:0;outline:0;flex:1;min-width:0;height:100%;background:none;font-size:15px}
+.fld input::placeholder{color:#6B726F}
+.fld select{border:0;outline:0;flex:1;min-width:0;height:100%;background:none;font-size:15px;appearance:none;-webkit-appearance:none;padding-right:4px;cursor:pointer}
+.fld select:invalid{color:#6B726F}
+.fld select option{color:var(--ink)}
+.fld .chev{color:#6B726F;pointer-events:none;margin-right:-2px}
+.flabel{position:absolute;top:-9px;left:10px;background:var(--surface);padding:0 4px;font-size:12px;color:var(--muted)}
+.eye{border:0;background:none;width:34px;height:34px;display:grid;place-items:center;color:#6B726F;margin-right:-6px}
+.hint{margin:-2px 0 0 8px;font-size:12px;color:var(--muted)}
+.hint.err{color:var(--down);font-weight:500}
+.btn-login{height:44px;border:0;border-radius:6px;background:var(--green-900);color:#fff;font-size:16px;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,.18)}
+.btn-login:hover{background:#12402F}
+.forgot{border:0;background:none;color:var(--green-900);text-decoration:underline;font-size:13px;padding:2px 0 4px}
+
+/* Cabeceras */
+.hdr-c{background:var(--surface);display:flex;justify-content:center;padding:18px 16px 14px;box-shadow:0 1px 0 var(--line)}
+.hdr-c img{height:76px;width:auto;max-width:100%}
+.hello{background:#E3E7E8;padding-block:18px}
+.hello .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hello h1{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.logout{border:1px solid var(--line);background:var(--surface);border-radius:8px;min-height:44px;min-width:44px;padding:0 10px;justify-content:center;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--muted);flex-shrink:0}
+.hdr{background:var(--surface);box-shadow:0 1px 0 var(--line),0 2px 6px rgba(0,0,0,.05);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.hdr .wrap{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-block:8px}
+.hdr img{height:38px;width:auto;flex-shrink:0}
+.who{text-align:right;line-height:1.15}
+.who{min-width:0}
+.who b{display:block;font-size:18px;font-weight:700;white-space:nowrap}
+.who small{font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
+.navrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-block:8px 6px}
+.back{display:inline-flex;align-items:center;gap:4px;min-height:44px;border:0;background:none;padding:0;font-size:17px;font-weight:500;color:var(--green-900);min-width:0}
+.back span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-size:13.5px;font-weight:500;color:var(--green-900);flex-shrink:0}
+
+/* 2 · Inicio */
+.menu{padding-top:22px;display:flex;flex-direction:column;gap:16px}
+.menu h2{font-size:22px;font-weight:700}
+.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mode{background:var(--surface);border:1.5px solid #C9CFCD;border-radius:12px;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:17px;font-weight:500;letter-spacing:.01em;text-transform:uppercase;color:var(--ink)}
+.mode svg{width:58px;height:58px;color:#3C4240}
+.mode[aria-pressed="true"]{background:var(--slate);border:2.5px solid var(--mode-on);color:#fff}
+.mode[aria-pressed="true"] svg{color:#fff}
+.cfg{background:var(--slate);color:#fff;border-radius:14px;padding:18px 18px 20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 6px 16px rgba(0,90,78,.25)}
+.cfg h3{font-size:22px;font-weight:700;margin-bottom:2px}
+.cfg label{display:flex;flex-direction:column;gap:6px;font-size:14px;letter-spacing:.03em;text-transform:uppercase;color:#E9ECEB}
+.cfg select,.cfg input{height:52px;border-radius:7px;border:1px solid #C9CFCD;background:#fff;color:var(--ink);padding:0 14px;font-size:16px;text-transform:none;letter-spacing:0;width:100%}
+.cfg .pv{font-size:13px;color:#E3E7E6;display:flex;flex-direction:column;gap:3px;padding-top:2px}
+.cfg .pv b{color:#fff;font-weight:500}
+.pv .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+.dot.alta{background:#FF8A5B} .dot.media{background:#F4C552} .dot.positiva{background:#7FDCA9} .dot.nada{background:#AEB5B3}
+.cta{height:58px;border:0;border-radius:9px;background:var(--green-600);color:#fff;font-size:19px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;box-shadow:0 3px 8px rgba(30,133,80,.3);margin-top:6px}
+.cta:hover{background:#19733F}
+.cta[disabled]{opacity:.5;cursor:not-allowed}
+.note{font-size:12.5px;color:var(--muted);text-align:center}
+
+/* 3 · Farmacia */
+.pcard{background:var(--surface);border:1.5px solid var(--edge);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.ptag{align-self:flex-start;border:1.5px solid var(--edge);border-radius:6px;padding:1px 7px;font-size:12px;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+.pcard h1{font-size:28px;font-weight:900;letter-spacing:-.01em;line-height:1.1;text-transform:uppercase;margin-top:4px}
+.pcard p{margin:0;font-size:15.5px;color:#2B302E}
+.tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;background:var(--surface);border:1.5px solid var(--edge);border-radius:10px;padding:4px;margin-block:12px}
+.tab{min-height:40px;border:0;border-radius:7px;background:none;font-size:14px;font-weight:500;padding:0 1px;color:var(--ink)}
+.tab[aria-selected="true"]{background:#E3E7E8}
+.panel{display:flex;flex-direction:column;gap:12px}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kpi{background:var(--surface);border:1.5px solid var(--edge);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.kpi .l{font-size:14px;color:#2B302E}
+.kpi .v{font-size:27px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+.kpi .s{font-size:14px}
+.green{background:var(--green-700);color:#fff;border-radius:12px;padding:14px 14px 16px;display:flex;flex-direction:column;gap:10px}
+.green h2{font-size:21px;font-weight:700}
+.gitem{background:var(--green-item);border:1px solid var(--green-line);border-radius:9px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}
+.gpill{grid-row:span 2;align-self:start;font-size:12.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:3px 7px;border-radius:5px}
+.gpill.alta{background:var(--alta-bg);color:var(--alta-fg)} .gpill.media{background:var(--media-bg);color:var(--media-fg)} .gpill.positiva{background:var(--ok-bg);color:var(--ok-fg);border:1px solid var(--green-line)}
+.gitem b{font-size:16.5px;font-weight:700;line-height:1.25}
+.gitem p{margin:0;font-size:13px;line-height:1.4;color:#E4F1EA}
+.gitem p em{font-style:normal;font-weight:700;color:#fff}
+.gempty{font-size:14px;color:#E4F1EA}
+.bigbtn{height:56px;border:0;border-radius:9px;background:var(--green-600);color:#fff;font-size:17px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 3px 8px rgba(30,133,80,.3)}
+.bigbtn:hover{background:#19733F}
+
+/* 4 · Marcas */
+.bchips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:none}
+.bchip{flex-shrink:0;min-height:36px;padding:0 14px;border-radius:99px;border:0;background:var(--chip);color:#fff;font-size:14px;font-weight:500;white-space:nowrap}
+.bchip[aria-pressed="true"]{background:#007C6B;box-shadow:0 2px 6px rgba(0,124,107,.35)}
+.mhead{font-size:17px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;margin-top:8px}
+.icard{background:var(--surface);border-radius:10px;box-shadow:0 2px 8px rgba(20,30,26,.10),0 0 0 1px rgba(20,30,26,.04);padding:12px 14px;display:grid;grid-template-columns:40px 1fr;gap:4px 12px;align-items:start}
+.icard svg{grid-row:span 2;width:34px;height:34px;color:var(--orange);margin-top:2px}
+.icard .t{font-size:15.5px;line-height:1.35}
+.icard .t b{font-weight:700}
+.icard .t small{display:block;font-size:14.5px;color:var(--ink);font-weight:400}
+.icard .f{font-size:12.5px;color:var(--muted)}
+.dcard{background:var(--surface);border-radius:10px;box-shadow:0 2px 8px rgba(20,30,26,.10),0 0 0 1px rgba(20,30,26,.04);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.dcard .l{font-size:15px;color:#2B302E}
+.dcard .v{font-size:30px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+.dcard .s{font-size:14.5px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.dcard .s svg{flex-shrink:0}
+.catchips{display:flex;gap:6px;flex-wrap:wrap}
+.catchip{min-height:34px;padding:0 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:500}
+.catchip[aria-pressed="true"]{background:var(--slate);color:#fff;border-color:var(--slate)}
+
+/* Bloques reutilizados (tableros) */
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sec-h h2{font-size:16.5px}
+.src{font-size:12px;color:var(--muted);font-weight:500}
+.up{color:var(--up);font-weight:700} .down{color:var(--down);font-weight:700}
+.empty{padding:14px;border-radius:10px;background:var(--surface);border:1px dashed var(--line);color:var(--muted);font-size:14px}
+.chart svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.readout{font-size:13.5px;min-height:20px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700;text-align:left;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+td.num,td .num{white-space:nowrap}
+.tscroll{overflow-x:auto}
+.bars{display:flex;flex-direction:column;gap:3px;min-width:90px}
+.bar{height:7px;border-radius:0 3px 3px 0;background:var(--brand)}
+.bar.z{background:var(--series-zone)}
+.small{font-size:12.5px;color:var(--muted)}
+details summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--green-700);min-height:36px;display:flex;align-items:center}
+.cat{display:flex;flex-direction:column;gap:8px;padding-block:12px;border-top:1px solid var(--line)}
+.cat:first-of-type{border-top:0;padding-top:0}
+.cat-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.cat-h b{font-size:15px}
+.share-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:14px}
+.big{font-weight:700;font-size:21px}
+.tops{display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.tops div{display:grid;grid-template-columns:1fr auto auto;gap:10px}
+.g{font-size:10.5px;font-weight:700;color:var(--grupo);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:4px;letter-spacing:.03em}
+.ped{display:flex;flex-direction:column}
+.ped-i{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding-block:11px;border-top:1px solid var(--line)}
+.ped-i:first-child{border-top:0}
+.ped-i b{font-size:14.5px}
+.ped-i .q{grid-row:span 2;align-self:center;text-align:right;font-weight:700;font-size:20px}
+.ped-i .q small{display:block;font-size:11px;color:var(--muted);font-weight:500}
+.kind{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:5px;margin-right:6px;background:var(--brand-soft);color:var(--brand-strong)}
+.kind.recuperar,.kind.revisar{background:var(--alta-soft);color:var(--alta)}
+.kind.incorporar,.kind.exhibir{background:var(--media-soft);color:var(--media)}
+.btn{min-height:46px;border-radius:9px;border:0;background:var(--green-600);color:#fff;font-weight:700;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.sec2{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.suc{display:grid;grid-template-columns:1fr auto;gap:8px;padding-block:8px;border-top:1px solid var(--line);font-size:14px}
+.suc:first-child{border-top:0}
+.suc .back{font-size:14px;min-height:32px}
+.lnk{border:0;background:none;padding:0;font-weight:700;color:var(--green-700);text-align:left;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.hrows{display:flex;flex-direction:column;gap:9px}
+.hrow,.hrow2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13.5px}
+.hl{min-width:0;overflow-wrap:anywhere;line-height:1.3}
+.ht,.pair{display:flex;flex-direction:column;gap:3px;min-width:0}
+.hbar{display:block;height:10px;border-radius:0 3px 3px 0}
+.pair .hbar{height:7px}
+.b-sel{background:var(--brand)} .b-grp{background:var(--series-grp)} .b-oth{background:var(--series-prev)} .b-zone{background:var(--series-zone)}
+.hv{text-align:right;font-weight:700;min-width:46px;white-space:nowrap}
+.hv small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
+.hv small.up{color:var(--up)} .hv small.down{color:var(--down)}
+.foot{font-size:12px;color:var(--muted);padding-top:6px;display:flex;flex-direction:column;gap:2px}
+@media (max-width:380px){ .tab{font-size:13px} .hello h1{font-size:21px} .who b{font-size:16px} .hdr img{height:32px} .pcard h1{font-size:24px} .mode{min-height:130px;font-size:15px} }
+@media (prefers-reduced-motion: no-preference){ .screen{animation:in .18s ease-out} @keyframes in{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}} }
+
+/* Asistente: botón verde "Preguntar" (mismo tamaño y forma que Inicio) + chat */
+.navbtns{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.askbtn{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;border-radius:8px;border:1px solid #007C6B;background:#007C6B;color:#fff;font-size:13.5px;font-weight:500;flex-shrink:0;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.askbtn:hover{background:#006A5B}
+.askbtn.rec{background:#C62828;border-color:#C62828;animation:pulse 1.2s infinite}
+.hello .askbtn{min-height:44px}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(198,40,40,.5)}70%{box-shadow:0 0 0 12px rgba(198,40,40,0)}100%{box-shadow:0 0 0 0 rgba(198,40,40,0)}}
+.recpill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:23;max-width:min(92vw,520px);display:flex;align-items:center;gap:10px;background:#fff;color:var(--ink);font-size:15px;padding:12px 16px;border-radius:26px;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.recpill i{width:11px;height:11px;border-radius:50%;background:#C62828;flex-shrink:0;animation:bl 1s infinite}
+.recpill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:24;max-width:min(92vw,520px);background:#1E2523;color:#fff;font-size:13.5px;line-height:1.4;padding:10px 14px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;display:flex;justify-content:center;padding:0 8px calc(8px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.sheet .box{pointer-events:auto;width:100%;max-width:560px;max-height:min(78vh,640px);background:#ECE5DD;border-radius:16px;box-shadow:0 -4px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+.sheet header{display:flex;align-items:center;gap:10px;background:#007C6B;color:#fff;padding:10px 12px}
+.sheet header .av{width:34px;height:34px;border-radius:50%;background:#fff;display:grid;place-items:center;color:#007C6B;font-weight:900;font-size:13px;flex-shrink:0}
+.sheet header b{display:block;font-size:15.5px;font-weight:700;line-height:1.2}
+.sheet header small{display:block;font-size:12px;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet header .x{margin-left:auto;border:0;background:none;color:#fff;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+.msgs{flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+.msg{max-width:88%;padding:8px 10px 6px;border-radius:10px;font-size:14.5px;line-height:1.45;box-shadow:0 1px 1px rgba(0,0,0,.12);overflow-wrap:anywhere}
+.msg.u{align-self:flex-end;background:#D9FDD3;border-top-right-radius:2px}
+.msg.a{align-self:flex-start;background:#fff;border-top-left-radius:2px}
+.msg .meta{display:block;text-align:right;font-size:11px;color:#667;margin-top:2px}
+.msg ul{margin:4px 0;padding-left:18px}
+.msg p{margin:0 0 4px}
+.msg .err{color:var(--down);font-weight:500}
+.msg .dots span{display:inline-block;width:6px;height:6px;margin-right:3px;border-radius:50%;background:#8A9490;animation:bl 1.2s infinite}
+.msg .dots span:nth-child(2){animation-delay:.2s}.msg .dots span:nth-child(3){animation-delay:.4s}
+@keyframes bl{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.sugs{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 4px}
+.sug{border:1px solid #BFD9D3;background:#fff;color:#00594D;border-radius:16px;padding:6px 11px;font-size:13px;text-align:left}
+.stop{align-self:flex-start;border:1px solid #BFC7C5;background:#fff;border-radius:16px;padding:5px 12px;font-size:12.5px;color:var(--ink)}
+.retry{border:0;background:none;color:#007C6B;font-weight:700;text-decoration:underline;padding:0;font-size:13px}
+.askrow{display:flex;align-items:center;gap:8px;padding:8px 8px 10px;background:#F0F2F5}
+.askfield{flex:1;min-width:0;display:flex;align-items:center;background:#fff;border-radius:24px;min-height:46px;padding:0 14px;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.askfield input{flex:1;min-width:0;border:0;outline:0;background:none;font-size:16px;height:44px}
+.askfield input::placeholder{color:#6B726F}
+.micbtn{width:48px;height:48px;border-radius:50%;border:0;background:#007C6B;color:#fff;display:grid;place-items:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,124,107,.35)}
+.micbtn.rec{background:#C62828}
+@media (prefers-reduced-motion: reduce){ .askbtn.rec,.recpill i,.msg .dots span{animation:none} }
+
+/* App web independiente */
+body{margin:0} img{max-width:100%} [hidden]{display:none!important}
+.remember{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:0 0 2px 6px;cursor:pointer;line-height:1.3}
+.remember input{width:18px;height:18px;accent-color:var(--green-900);margin:0;flex-shrink:0}
+.btn-login:disabled{opacity:.8;cursor:wait}
+.carga{align-items:center;justify-content:center;background:radial-gradient(1200px 500px at 50% -10%, #F7F9FA, var(--bg))}
+.carga .grow{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;color:var(--muted);font-size:14px;padding:16px}
+.spin{width:30px;height:30px;border-radius:50%;border:3px solid #CFE3DE;border-top-color:#007C6B;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cfg select:disabled{opacity:1;color:var(--ink);background:#F3F5F4}
+@media (prefers-reduced-motion: reduce){ .spin{animation-duration:3s} }
+</style>
+</head>
+<body>
+<noscript><p style="padding:16px">SmartBrick necesita JavaScript activado.</p></noscript>
+
+<!-- 0 · Cargando -->
+<section id="s-carga" class="screen carga">
+  <div class="grow"><img class="login-logo" alt="SmartBrick · Asistente de Ventas" src="img/logo.png"><div class="spin" aria-hidden="true"></div><p role="status">Abriendo SmartBrick…</p></div>
+</section>
+
+<!-- 1 · Login -->
+<section id="s-login" class="screen login" hidden>
+  <div class="grow">
+    <img class="login-logo" alt="SmartBrick · Asistente de Ventas" src="img/logo.png">
+    <h1 class="welcome">Bienvenido a SmartBrick,<br>Tu Asistente de Visita de Farmacias.</h1>
+    <form class="lcard" id="loginForm" novalidate>
+      <div class="fld">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"></path></svg>
+        <label for="lu" class="sr">Nombre de usuario</label>
+        <select id="lu" required autocomplete="username"><option value="" disabled selected>Cargando usuarios…</option></select>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+      </div>
+      <div class="fld" style="margin-top:6px">
+        <span class="flabel" aria-hidden="true">Contraseña</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path><circle cx="12" cy="16" r="1"></circle></svg>
+        <label for="lp" class="sr">Contraseña</label>
+        <input id="lp" type="password" autocomplete="current-password">
+        <button type="button" class="eye" id="eye" aria-label="Mostrar contraseña"></button>
+      </div>
+      <p class="hint" id="lmsg" aria-live="polite"></p>
+      <label class="remember"><input type="checkbox" id="lrec" checked>Mantener la sesión iniciada en este dispositivo</label>
+      <button class="btn-login" type="submit">Iniciar Sesión</button>
+      <button type="button" class="forgot" id="forgot">¿Olvidaste tu contraseña?</button>
+    </form>
+  </div>
+  <footer class="powered" style="background:none;margin-top:24px">Powered by <b>Megalabs</b></footer>
+</section>
+
+<!-- 2 · Inicio -->
+<section id="s-menu" class="screen" hidden>
+  <header class="hdr-c"><img alt="SmartBrick · Asistente de Ventas" src="img/logo.png"></header>
+  <div class="hello"><div class="wrap"><h1 id="hola"></h1><div class="navbtns"><button class="askbtn" aria-label="Preguntar: mantené apretado para hablar, o tocá para escribir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg><span class="lbl">Preguntar</span></button><button class="logout" id="logout" aria-label="Cerrar sesión" title="Cerrar sesión"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"></path><path d="M10 16l-4-4 4-4"></path><path d="M6 12h10"></path></svg><span class="sr">Cerrar sesión</span></button></div></div></div>
+  <div class="grow"><div class="wrap menu">
+    <h2>Selecciona tu tipo de visita:</h2>
+    <div class="modes" role="group" aria-label="Tipo de visita">
+      <button class="mode" data-mode="farm" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10.5 5 6h14l1.5 4.5"></path><path d="M4.5 10.5V21h15V10.5"></path><path d="M3 10.5h18"></path><path d="M10 21v-5h4v5"></path><rect x="6.5" y="13" width="2.5" height="2.5"></rect><rect x="15" y="13" width="2.5" height="2.5"></rect><path d="M12 1.8v3M10.5 3.3h3"></path></svg>
+        Farmacias</button>
+      <button class="mode" data-mode="zona" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5s-5-4.4-5-8.3a5 5 0 0 1 10 0c0 3.9-5 8.3-5 8.3z"></path><circle cx="12" cy="7.3" r="1.8"></circle><path d="M7.5 14 3 15.5v6.5l6-2 6 2 6-2v-6.5L16.5 14"></path><path d="M9 20v-3.5M15 22v-4"></path></svg>
+        Zonas (Brick)</button>
+    </div>
+    <div class="cfg" id="cfg">
+      <h3>Configuración de Visita</h3>
+      <label for="cCartera" id="lCartera" hidden>Cartera de<select id="cCartera"></select></label>
+      <label for="cBuscar" data-for="farm">Buscar farmacia<input id="cBuscar" type="search" placeholder="Nombre de la farmacia" autocomplete="off"></label>
+      <label for="cTipo" data-for="farm">Tipo de punto de venta<select id="cTipo"></select></label>
+      <label for="cZona" data-for="zona">Zona (Brick)<select id="cZona"></select></label>
+      <label for="cFarm">Farmacia<select id="cFarm"></select></label>
+      <div class="pv" id="cPrev" aria-live="polite"></div>
+    </div>
+    <button class="cta" id="start">Comenzar visita</button>
+  </div></div>
+  <footer class="powered">Powered by <b>Megalabs</b></footer>
+</section>
+
+<!-- 3 · Farmacia -->
+<section id="s-farm" class="screen" hidden>
+  <header class="hdr"><div class="wrap"><img alt="SmartBrick · Asistente de Ventas" src="img/logo.png"><div class="who"><b class="wname"></b><small class="wsub"></small></div></div></header>
+  <div class="grow"><div class="wrap">
+    <nav class="navrow" aria-label="Navegación"><button class="back" data-nav="menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg><span>Farmacias</span></button>
+      <div class="navbtns"><button class="askbtn" aria-label="Preguntar: mantené apretado para hablar, o tocá para escribir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg><span class="lbl">Preguntar</span></button><button class="home" data-nav="menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</button></div></nav>
+    <div class="pcard" id="pcard"></div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div id="fpanel" class="panel" role="tabpanel"></div>
+  </div></div>
+  <footer class="powered">Powered by <b>Megalabs</b></footer>
+</section>
+
+<!-- 4 · Marcas -->
+<section id="s-marca" class="screen" hidden>
+  <header class="hdr"><div class="wrap"><img alt="SmartBrick · Asistente de Ventas" src="img/logo.png"><div class="who"><b class="wname"></b><small class="wsub"></small></div></div></header>
+  <div class="grow"><div class="wrap">
+    <nav class="navrow" aria-label="Navegación"><button class="back" data-nav="farm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg><span id="mback"></span></button>
+      <div class="navbtns"><button class="askbtn" aria-label="Preguntar: mantené apretado para hablar, o tocá para escribir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg><span class="lbl">Preguntar</span></button><button class="home" data-nav="menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</button></div></nav>
+    <div class="bchips" role="group" aria-label="Marca" id="bchips"></div>
+    <div id="mpanel" class="panel"></div>
+  </div></div>
+  <footer class="powered">Powered by <b>Megalabs</b></footer>
+</section>
+
+
+<!-- Asistente SmartBrick -->
+<div class="sheet" id="askSheet" hidden>
+  <div class="box" role="dialog" aria-label="Asistente SmartBrick">
+    <header><span class="av" aria-hidden="true">SB</span><div style="min-width:0"><b>Asistente SmartBrick</b><small id="askCtx"></small></div>
+      <button class="x" id="askClose" aria-label="Cerrar asistente"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></header>
+    <div class="msgs" id="askMsgs" aria-live="polite"></div>
+    <div class="askrow">
+      <div class="askfield"><label for="askInput" class="sr">Pregunta para SmartBrick</label><input id="askInput" type="text" placeholder="Escribí o dictá tu pregunta…" autocomplete="off" enterkeyhint="send"></div>
+      <button class="micbtn" id="askSend" aria-label="Dictar pregunta"></button>
+    </div>
+  </div>
+</div>
+<div class="recpill" id="recPill" hidden role="status"><i></i><span id="recTxt">Escuchando… soltá para enviar</span></div>
+<div class="tip" id="askTip" hidden role="status"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
