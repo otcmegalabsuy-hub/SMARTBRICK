@@ -894,7 +894,7 @@ function md(t){
 const hhmm=()=>{ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
 function saludo(){
   const nom=SES&&SES.rol==='vendedor'?', '+esc(SES.nombre.split(' ')[0]):'';
-  const como=vozOK()?'mantené apretado el botón <b>Preguntar</b> y hablá, o tocá el micrófono de abajo y hablá.':'escribí tu pregunta abajo (podés usar el micrófono del teclado para dictarla).';
+  const como=vozOK()?'tocá <b>Preguntar</b>, hablá y tocá el botón rojo para enviar. También podés mantener apretado <b>Preguntar</b> mientras hablás y soltarlo al terminar.':'escribí tu pregunta abajo (podés usar el micrófono del teclado para dictarla).';
   const off=CONFIG.asistenteUrl?'':'<p class="small"><b>Aviso:</b> el asistente todavía no está conectado; por ahora solo transcribo la pregunta.</p>';
   return `<div class="msg a"><p>Hola${nom}. Preguntame lo que necesites antes de entrar: ${como}</p>${off}</div>`;
 }
@@ -950,63 +950,108 @@ async function sendAsk(text, voz){
 }
 
 // ---- Voz con el reconocimiento del navegador (Chrome, Edge, Safari)
-// Botón verde "Preguntar": mantener apretado = hablar y soltar para enviar; tocar = abrir el chat.
-// Micrófono redondo del chat: tocar para empezar a hablar y tocar de nuevo para enviar.
+// Botón verde "Preguntar":
+//   · tocar: abre el chat y empieza a escuchar; se termina con el botón rojo (o "Enviar") y la X cancela.
+//   · mantener apretado: hablar y soltar para enviar, como un audio de WhatsApp.
+// Mientras escucha siempre hay una forma visible de enviar o cancelar, y un tope de 60 segundos.
+// Si el navegador no avisa que terminó (pasa en algunos iPhone), a los 1,5 s se cierra igual.
 let tipTimer=null;
+const MAX_REC=60000;
 function tip(msg,ms){ const t=$('#askTip'); t.textContent=msg; t.hidden=false; clearTimeout(tipTimer); tipTimer=setTimeout(()=>{t.hidden=true;},ms||5000); }
 function dictationFallback(){ openSheet(true); tip('Tu navegador no permite dictar acá. Tocá el micrófono de tu teclado para dictar la pregunta y enviala con la flecha verde.',7000); }
 const askBtns=()=>document.querySelectorAll('.askbtn');
+// botones Cancelar / Enviar dentro del aviso "Escuchando…"
+(function(){
+  const p=$('#recPill'); p.removeAttribute('role'); $('#recTxt').setAttribute('aria-live','polite');
+  p.insertAdjacentHTML('beforeend','<button type="button" class="rb cancel" id="recCancel">Cancelar</button><button type="button" class="rb send" id="recSend">Enviar</button>');
+  const st=document.createElement('style');
+  st.textContent='.recpill{padding:8px 8px 8px 16px}.recpill span{flex:1;min-width:0}.recpill .rb{border:0;border-radius:18px;min-height:38px;padding:0 14px;font-size:14px;font-weight:700;flex-shrink:0;font-family:inherit}.recpill .rb.cancel{background:#EEF1F3;color:#151A18}.recpill .rb.send{background:#007C6B;color:#fff}';
+  document.head.appendChild(st);
+  $('#recCancel').addEventListener('click',()=>stopRec(true));
+  $('#recSend').addEventListener('click',()=>stopRec(false));
+})();
 function recUI(on){
   const hold=ASK.mode==='down';
-  askBtns().forEach(b=>{ b.classList.toggle('rec',on&&hold); const l=b.querySelector('.lbl'); if(l) l.textContent=on&&hold?'Escuchando':'Preguntar'; });
+  askBtns().forEach(b=>{ b.classList.toggle('rec',on); const l=b.querySelector('.lbl'); if(l) l.textContent=on?(hold?'Escuchando':'Enviar'):'Preguntar'; });
   $send.classList.toggle('rec',on&&!hold);
   $in.placeholder= on&&!hold ? 'Escuchando… tocá el botón rojo para enviar' : PH_IN;
   const p=$('#recPill'); p.hidden=!(on&&hold); clearInterval(ASK.timer);
-  if(on&&hold){ ASK.recStart=Date.now(); $('#recTxt').textContent='Escuchando… soltá para enviar';
-    ASK.timer=setInterval(()=>{ if(!ASK.recTxt){ const s=Math.floor((Date.now()-ASK.recStart)/1000); $('#recTxt').textContent=`0:${String(s).padStart(2,'0')} · Escuchando… soltá para enviar`; } },500); }
+  if(on&&hold){
+    $('#recTxt').textContent=ASK.recTxt||'Escuchando… soltá para enviar';
+    ASK.timer=setInterval(()=>{ if(!ASK.recTxt){ const s=Math.floor((Date.now()-ASK.recStart)/1000); $('#recTxt').textContent=`0:${String(s).padStart(2,'0')} · Escuchando… soltá para enviar`; } },500);
+  }
   setSendIcon();
 }
 function startRec(src){
   if(!vozOK()) return false;
   if(ASK.sr) return true;
   let rec; try{ rec=new SR(); }catch(e){ ASK.srBlocked=true; return false; }
-  ASK.sr=rec; ASK.mode=src; ASK.recTxt=''; ASK.discard=false; ASK.userTyped=false;
+  ASK.sr=rec; ASK.mode=src; ASK.recTxt=''; ASK.discard=false; ASK.userTyped=false; ASK.gotResult=false; ASK.recStart=Date.now();
   rec.lang=CONFIG.idiomaVoz||'es-UY'; rec.interimResults=true; rec.continuous=true; rec.maxAlternatives=1;
-  rec.onresult=ev=>{ let t=''; for(let i=0;i<ev.results.length;i++) t+=ev.results[i][0].transcript; ASK.recTxt=t.trim();
-    if(!ASK.recTxt) return; if(ASK.mode==='down') $('#recTxt').textContent=ASK.recTxt; else if(!ASK.userTyped) $in.value=ASK.recTxt; };
+  rec.onresult=ev=>{ if(rec._done) return; let t=''; for(let i=0;i<ev.results.length;i++) t+=ev.results[i][0].transcript; ASK.recTxt=t.trim();
+    if(!ASK.recTxt) return; ASK.gotResult=true;
+    if(ASK.mode==='down') $('#recTxt').textContent=ASK.recTxt; else if(!ASK.userTyped) $in.value=ASK.recTxt; };
   rec.onerror=ev=>{
+    if(rec._done) return;
     const er=ev.error;
     if(er==='not-allowed'||er==='service-not-allowed'){
-      ASK.discard=true;
-      if(src==='down'&&!ASK.clickOnly){ ASK.clickOnly=true; openSheet(false); tip('Tocá el micrófono verde para hablar y tocalo de nuevo para enviar. Si el navegador pide permiso para el micrófono, aceptalo.',7000); }
-      else { ASK.srBlocked=true; openSheet(true); tip('El navegador no tiene permiso para usar el micrófono. Habilitalo para este sitio en la configuración del navegador, o dictá con el micrófono del teclado.',9000); }
-    } else if(er==='audio-capture'){ ASK.discard=true; ASK.srBlocked=true; openSheet(true); tip('No encontré un micrófono en este dispositivo. Escribí tu pregunta.',6000); }
-    else if(er==='network'){ ASK.discard=true; tip('El dictado necesita conexión a internet. Probá de nuevo.',5000); }
-    else if(er==='no-speech'){ tip(ASK.mode==='down'?'No te escuché. Mantené apretado Preguntar mientras hablás.':'No te escuché. Tocá el micrófono y hablá.',4000); }
+      stopRec(true);
+      if(src==='down'&&!ASK.clickOnly){ ASK.clickOnly=true; openSheet(false); tip('Tocá Preguntar para hablar y tocá el botón rojo para enviar. Si el teléfono pide permiso para el micrófono, aceptalo.',7000); }
+      else { ASK.srBlocked=true; openSheet(true); tip('El navegador no tiene permiso para el micrófono. Habilitalo para este sitio (en iPhone: Ajustes → Safari → Micrófono, y Ajustes → General → Teclado → Activar dictado), o dictá con el micrófono del teclado.',10000); }
+    } else if(er==='audio-capture'){ stopRec(true); ASK.srBlocked=true; openSheet(true); tip('No encontré un micrófono en este dispositivo. Escribí tu pregunta.',6000); }
+    else if(er==='network'){ stopRec(true); tip('El dictado necesita conexión a internet. Probá de nuevo.',5000); }
   };
-  rec.onend=()=>{ const m=ASK.mode; let t=ASK.recTxt; ASK.sr=null; recUI(false);
-    if(m!=='down'){ if(ASK.userTyped||!t) t=$in.value.trim(); $in.value=''; setSendIcon(); }
-    if(t&&!ASK.discard) sendAsk(t, m==='down'||!ASK.userTyped); ASK.discard=false; };
-  try{ rec.start(); recUI(true); return true; }catch(e){ ASK.sr=null; recUI(false); return false; }
+  rec.onend=()=>finalizeRec(rec);
+  try{ rec.start(); }catch(e){ ASK.sr=null; return false; }
+  recUI(true);
+  clearTimeout(ASK.maxT);
+  ASK.maxT=setTimeout(()=>{ if(ASK.sr===rec){ tip('Llegaste al máximo de 60 segundos: envío lo que escuché.',4000); stopRec(false); } },MAX_REC);
+  return true;
 }
-function stopRec(discard){ ASK.discard=!!discard; if(ASK.sr){ try{ discard?ASK.sr.abort():ASK.sr.stop(); }catch(e){} } }
+// cierra la grabación una sola vez (cuando el navegador avisa o por el tiempo de espera) y envía lo escuchado
+function finalizeRec(rec){
+  if(rec._done) return; rec._done=true;
+  clearTimeout(ASK.maxT); clearTimeout(ASK.stopT);
+  if(ASK.sr!==rec) return;
+  const m=ASK.mode, discard=ASK.discard, dur=Date.now()-ASK.recStart, got=ASK.gotResult;
+  let t=ASK.recTxt;
+  ASK.sr=null; ASK.discard=false; recUI(false);
+  if(m!=='down'){ if(ASK.userTyped||!t) t=$in.value.trim(); $in.value=''; setSendIcon(); }
+  if(discard) return;
+  if(t){ ASK.emptyRuns=0; sendAsk(t, m==='down'||!ASK.userTyped); return; }
+  if(dur>1500&&!got){
+    ASK.emptyRuns=(ASK.emptyRuns||0)+1;
+    if(ASK.emptyRuns>=2){ openSheet(true); tip('El navegador no está transcribiendo tu voz. Usá el micrófono del teclado para dictar y enviá con la flecha verde.',8000); }
+    else tip('No te escuché. Probá de nuevo hablando cerca del teléfono.',4000);
+  }
+}
+function stopRec(discard){
+  const rec=ASK.sr; if(!rec||rec._done) return;
+  if(discard) ASK.discard=true;
+  try{ discard?rec.abort():rec.stop(); }catch(e){}
+  clearTimeout(ASK.stopT);
+  ASK.stopT=setTimeout(()=>{ if(!rec._done){ try{ rec.abort(); }catch(e){} finalizeRec(rec); } },1500);
+}
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&ASK.sr) stopRec(true); });
 document.addEventListener('contextmenu',e=>{ if(e.target.closest('.askbtn')) e.preventDefault(); });
 document.addEventListener('pointerdown',e=>{
   const b=e.target.closest('.askbtn'); if(!b||e.button>0) return;
-  e.preventDefault(); ASK.holding=true; ASK.wasHold=false; ASK.downAt=Date.now();
+  e.preventDefault(); ASK.wasHold=false; ASK.downAt=Date.now();
+  if(ASK.sr){ ASK.pressStops=true; ASK.holding=false; return; }   // ya está escuchando: este toque termina y envía
+  ASK.pressStops=false; ASK.holding=true;
   try{ b.setPointerCapture(e.pointerId); }catch(_){}
-  ASK.recording = (vozOK()&&!ASK.clickOnly&&!ASK.sr) ? startRec('down') : false;
+  ASK.recording = (vozOK()&&!ASK.clickOnly) ? startRec('down') : false;
 });
 const endHold=()=>{ if(!ASK.holding) return; ASK.holding=false; const held=Date.now()-ASK.downAt;
   if(held>=450){ ASK.wasHold=true; if(ASK.recording) stopRec(false); else if(!vozOK()) dictationFallback(); else openSheet(false); }
-  else if(ASK.recording) stopRec(true);
   ASK.recording=false; };
 document.addEventListener('pointerup',endHold); document.addEventListener('pointercancel',endHold);
 document.addEventListener('click',e=>{ const b=e.target.closest('.askbtn'); if(!b) return;
+  if(ASK.pressStops){ ASK.pressStops=false; stopRec(false); return; }
   if(ASK.wasHold){ ASK.wasHold=false; return; }
   if(!vozOK()){ dictationFallback(); return; }
-  openSheet(false);
-  if(ASK.clickOnly) startRec('click');
+  if(ASK.sr){ ASK.mode='click'; recUI(true); openSheet(false); return; }   // el toque ya empezó a escuchar: sigue en modo "tocar para enviar"
+  openSheet(false); startRec('click');
 });
 // botón redondo del chat: si está escuchando, termina y envía; si hay texto, lo envía; si no, empieza a escuchar
 $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($in.value.trim()){ sendAsk($in.value); return; } if(!startRec('click')) dictationFallback(); });
