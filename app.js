@@ -502,7 +502,7 @@ $('#cCartera').addEventListener('change',async e=>{ const sel=e.target; sel.disa
   finally{ sel.disabled=SES.carteras.length<2; } });
 
 // ---- 2 · Inicio
-const MST={ mode: store.get('mode','zona'), tipo: store.get('tipo','todas'), zona: store.get('zonaSel', null), orden: store.get('orden','prio'), q:'', farm: null };
+const MST={ fecha: null, mode: (m=>m==='ruta'?'ruta':'farm')(store.get('mode','farm')), tipo: store.get('tipo','todas'), zona: store.get('zonaSel', null), orden: store.get('orden','prio'), q:'', farm: null };
 const TIPOS=[['todas','Todos'],['INDEPENDIENTE','Independientes'],['FARMASHOP','Farmashop'],['SAN ROQUE','San Roque'],['NATAL','Natal']];
 function farmList(){
   let L=F.filter(f=> MST.mode==='zona' ? (MST.zona==='sin' ? !f.brick : String(f.brick)===MST.zona)
@@ -523,13 +523,14 @@ function optLabel(f){
 }
 function renderMenu(){
   document.querySelectorAll('.mode').forEach(m=>m.setAttribute('aria-pressed', m.dataset.mode===MST.mode));
-  document.querySelectorAll('#cfg [data-for]').forEach(l=>l.hidden = l.dataset.for!==MST.mode);
+  document.querySelectorAll('#cfg [data-for]').forEach(l=>l.hidden = !l.dataset.for.split(' ').includes(MST.mode));
   $('#cTipo').value=MST.tipo; $('#cZona').value=MST.zona;
   const L=farmList();
   $('#cFarm').innerHTML = L.length ? L.map(f=>`<option value="${esc(f.id)}">${esc(optLabel(f))}</option>`).join('') : '<option value="">No hay farmacias con esa configuración</option>';
   if(!L.some(f=>f.id===MST.farm)) MST.farm = L.length? L[0].id : null;
   if(MST.farm) $('#cFarm').value=MST.farm;
-  $('#start').disabled=!MST.farm;
+  $('#start').disabled=!MST.farm; $('#start').textContent='Comenzar visita';
+  if(MST.mode==='ruta') renderRuta();
   preview();
 }
 function preview(){
@@ -544,7 +545,85 @@ $('#cTipo').addEventListener('change',e=>{ MST.tipo=e.target.value; store.set('t
 $('#cZona').addEventListener('change',e=>{ MST.zona=e.target.value; store.set('zonaSel',MST.zona); renderMenu(); });
 $('#cBuscar').addEventListener('input',e=>{ MST.q=e.target.value.trim().toLowerCase(); renderMenu(); });
 $('#cFarm').addEventListener('change',e=>{ MST.farm=e.target.value; preview(); });
-$('#start').addEventListener('click',()=>{ if(MST.farm) openFicha(MST.farm); });
+$('#start').addEventListener('click',()=>{
+  if(MST.mode==='ruta'){ const ids=rutaGet(MST.fecha); if(ids.length){ RUTA_NAV={fecha:MST.fecha, ids, idx:0}; openFicha(ids[0]); } return; }
+  RUTA_NAV=null; if(MST.farm) openFicha(MST.farm); });
+
+// ---- Armar rutas: el vendedor elige un día y toca las farmacias en el orden en que las va a visitar.
+// Las rutas se guardan en este dispositivo, por usuario y cartera.
+const isoDia=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const isoHoy=()=>isoDia(new Date());
+const isoMan=()=>{ const d=new Date(); d.setDate(d.getDate()+1); return isoDia(d); };
+const fechaD=iso=>{ const [y,m,d]=String(iso).split('-').map(Number); return new Date(y,m-1,d); };
+const fechaLarga=iso=>{ const s=fechaD(iso).toLocaleDateString('es-UY',{weekday:'long',day:'numeric',month:'long'}); return s.charAt(0).toUpperCase()+s.slice(1); };
+const fechaCorta=iso=>{ const d=fechaD(iso); return d.toLocaleDateString('es-UY',{weekday:'short'}).replace('.','')+' '+d.getDate()+'/'+(d.getMonth()+1); };
+const rutasKey=()=>'rutas.'+(SES?SES.nombre:'')+'.'+(SES?SES.cartera:'');
+function rutasAll(){ const a=store.get(rutasKey(),{}); return (a&&typeof a==='object')?a:{}; }
+function rutaGet(f){ return (rutasAll()[f]||[]).filter(id=>F.some(x=>x.id===id)); }
+function rutaSet(f,ids){
+  const a=rutasAll(); if(ids.length) a[f]=ids; else delete a[f];
+  const lim=isoDia(new Date(Date.now()-60*864e5)); Object.keys(a).forEach(k=>{ if(k<lim) delete a[k]; });   // se descartan rutas de hace más de 60 días
+  store.set(rutasKey(),a);
+}
+let RUTA_NAV=null;   // ruta en curso cuando se recorre con "Comenzar ruta"
+const fById=id=>F.find(x=>x.id===id);
+function altaTxt(f){ const n=(f.alertas||[]).filter(a=>a.nivel==='alta').length; return n?` · ${n} alerta${n>1?'s':''} alta${n>1?'s':''}`:''; }
+function renderRuta(){
+  if(!MST.fecha) MST.fecha=isoHoy();
+  $('#cFecha').value=MST.fecha;
+  $('#rDia').textContent=fechaLarga(MST.fecha);
+  // accesos rápidos: hoy, mañana y días con ruta guardada
+  const hoy=isoHoy(), man=isoMan(), all=rutasAll();
+  const dias=[hoy,man,...Object.keys(all).filter(k=>k>=hoy&&k!==hoy&&k!==man).sort().slice(0,5)];
+  $('#rFechas').innerHTML=dias.map(k=>{ const n=(all[k]||[]).length; const t=k===hoy?'Hoy':k===man?'Mañana':fechaCorta(k);
+    return `<button type="button" class="rchip" data-f="${k}" aria-pressed="${k===MST.fecha}">${t}${n?` · ${n}`:''}</button>`; }).join('');
+  // orden de visita
+  const ids=rutaGet(MST.fecha);
+  $('#rLista').innerHTML = `<div class="rlh"><b>Orden de visita${ids.length?` (${ids.length})`:''}</b>${ids.length?'<button type="button" class="rvaciar" id="rVaciar">Vaciar</button>':''}</div>`+
+    (ids.length ? ids.map((id,i)=>{ const f=fById(id); return `<div class="rs"><span class="rn">${i+1}</span><span class="rt"><b>${esc(f.nombre)}</b><small>${TIPO[f.tipo]} · ${f.brick?esc(zonaCorta(f.brick)):'Sin brick'}${altaTxt(f)}</small></span>
+      <button type="button" data-mv="-1" data-id="${esc(id)}" aria-label="Subir" ${i?'':'disabled'}>↑</button><button type="button" data-mv="1" data-id="${esc(id)}" aria-label="Bajar" ${i<ids.length-1?'':'disabled'}>↓</button><button type="button" data-rm="${esc(id)}" aria-label="Quitar de la ruta">✕</button></div>`; }).join('')
+    : '<p class="rvacia">Todavía no hay farmacias para este día. Tocalas abajo en el orden en que las vas a visitar.</p>');
+  // farmacias para elegir, agrupadas por zona
+  let L=F.filter(f=>(MST.tipo==='todas'||f.tipo===MST.tipo)&&(!MST.q||f.nombre.toLowerCase().includes(MST.q)));
+  L.sort((a,b)=>(a.brick?zonaCorta(a.brick):'~').localeCompare(b.brick?zonaCorta(b.brick):'~','es')||a.nombre.localeCompare(b.nombre,'es'));
+  let h='', z=null;
+  L.forEach(f=>{ const zz=f.brick?zonaCorta(f.brick):'Sin brick asignado'; if(zz!==z){ z=zz; h+=`<div class="rzona">${esc(zz)}</div>`; }
+    const pos=ids.indexOf(f.id);
+    h+=`<button type="button" class="rp" data-id="${esc(f.id)}" aria-pressed="${pos>=0}"><span class="rn">${pos>=0?pos+1:''}</span><span class="rt"><b>${esc(f.nombre)}</b><small>${TIPO[f.tipo]}${altaTxt(f)}</small></span></button>`; });
+  $('#rPick').innerHTML = h || '<p class="rvacia" style="padding:12px">No hay farmacias con ese filtro.</p>';
+  const n=ids.length, st=$('#start');
+  st.textContent = n ? `Comenzar ruta (${n})` : 'Elegí las farmacias del día';
+  st.disabled=!n;
+}
+function rutaToggle(id){ const ids=rutaGet(MST.fecha); const i=ids.indexOf(id); if(i>=0) ids.splice(i,1); else ids.push(id); rutaSet(MST.fecha,ids); }
+$('#cFecha').addEventListener('change',e=>{ if(e.target.value){ MST.fecha=e.target.value; renderRuta(); } });
+$('#rFechas').addEventListener('click',e=>{ const b=e.target.closest('[data-f]'); if(!b) return; MST.fecha=b.dataset.f; renderRuta(); });
+$('#rPick').addEventListener('click',e=>{ const b=e.target.closest('.rp'); if(!b) return; const sc=$('#rPick').scrollTop; rutaToggle(b.dataset.id); renderRuta(); $('#rPick').scrollTop=sc; });
+$('#rLista').addEventListener('click',e=>{
+  if(e.target.closest('#rVaciar')){ if(confirm('¿Vaciar la ruta del '+fechaLarga(MST.fecha).toLowerCase()+'?')){ rutaSet(MST.fecha,[]); renderRuta(); } return; }
+  const rm=e.target.closest('[data-rm]'); if(rm){ rutaToggle(rm.dataset.rm); renderRuta(); return; }
+  const mv=e.target.closest('[data-mv]'); if(mv){ const ids=rutaGet(MST.fecha), i=ids.indexOf(mv.dataset.id), j=i+Number(mv.dataset.mv);
+    if(i>=0&&j>=0&&j<ids.length){ [ids[i],ids[j]]=[ids[j],ids[i]]; rutaSet(MST.fecha,ids); renderRuta(); } }
+});
+// barra de ruta en la ficha: parada actual, anterior y siguiente
+function renderRutaBar(){
+  const el=$('#rutaBar'), R=RUTA_NAV;
+  if(!R||!cur||R.ids[R.idx]!==cur.id){ el.hidden=true; return; }
+  const n=R.ids.length, i=R.idx, next=i<n-1?fById(R.ids[i+1]):null;
+  el.hidden=false;
+  el.innerHTML=`<div class="rb-t"><b>Ruta · ${esc(fechaCorta(R.fecha))} · parada ${i+1} de ${n}</b><small>${next?'Siguiente: '+esc(next.nombre):'Última parada de la ruta'}</small></div>
+    <div class="rb-b"><button type="button" class="rbn" data-rn="-1" ${i?'':'disabled'} aria-label="Farmacia anterior">‹</button><button type="button" class="rbn" data-rn="1" ${next?'':'disabled'}>Siguiente ›</button></div>`;
+}
+$('#rutaBar').addEventListener('click',e=>{ const b=e.target.closest('[data-rn]'); if(!b||!RUTA_NAV) return;
+  const j=RUTA_NAV.idx+Number(b.dataset.rn); if(j<0||j>=RUTA_NAV.ids.length) return; RUTA_NAV.idx=j; openFicha(RUTA_NAV.ids[j]); });
+// contexto para el asistente
+function rutaCtx(){
+  if(!F) return ''; const f=(MST&&MST.fecha)||isoHoy(); let ids=rutaGet(f), dia=f;
+  if(!ids.length&&f!==isoHoy()){ ids=rutaGet(isoHoy()); dia=isoHoy(); }
+  if(!ids.length) return '';
+  return `Ruta planificada para el ${fechaLarga(dia).toLowerCase()} (en orden de visita): ${ids.map((id,i)=>{ const x=fById(id); return `${i+1}. ${x.nombre} (id ${x.id})`; }).join('; ')}.\n`;
+}
+
 
 // ---- 3 · Farmacia
 function openFicha(id){ const f=F.find(x=>x.id===id); if(!f) return; cur=f; curTab='resumen'; MST.farm=id; show('farm'); renderFarm(); }
@@ -556,7 +635,7 @@ function renderFarm(){
   const esF=esFarmacia(f);
   const tabs=[['resumen','Resumen'],[esF?'compras':'ventas',esF?'Compras':'Ventas'],['marca','Marca'],['zona','Zona'],['pedido','Pedido']];
   $('#tabs').innerHTML=tabs.map(([k,l])=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${k===curTab}">${l}</button>`).join('');
-  renderFarmTab();
+  renderFarmTab(); renderRutaBar();
 }
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('.tab'); if(!b) return; if(b.dataset.k==='marca'){ openMarcas(); return; } curTab=b.dataset.k; document.querySelectorAll('#tabs .tab').forEach(t=>t.setAttribute('aria-selected',t===b)); renderFarmTab(); });
 function renderFarmTab(){
@@ -805,7 +884,7 @@ Reglas:
 - Celsius, Spefar, Servimedic, Haymann y Dispert son del Grupo Megalabs: no son competencia.
 - Si la pregunta es ambigua, respondé lo más probable y ofrecé en una línea la alternativa.
 Contexto: ${ctx} Hoy es ${hoy()}.
-Marcas OTC de Megalabs: ${Object.keys(MARCA).map(marca).join(', ')}.
+${rutaCtx()}Marcas OTC de Megalabs: ${Object.keys(MARCA).map(marca).join(', ')}.
 
 CARTERA (id | nombre | tipo | brick y zona | compras/ventas | alertas):
 ${carteraLines()}`;
@@ -880,7 +959,8 @@ function ctxLabel(){ return (screen==='marca'&&cur)? cur.nombre+' · '+marca(cur
 function suggestions(){
   if(screen==='marca'&&cur){ const m=marca(curBrand); return [`¿Qué presentación de ${m} le propongo?`,`¿Cómo viene ${m} en esta zona contra la competencia?`,`¿Por qué cambiaron sus compras de ${m}?`]; }
   if(screen==='farm'&&cur) return ['¿Qué le ofrezco hoy a esta farmacia?','¿Por qué cambiaron sus compras?','Resumime la visita en 3 puntos'];
-  return ['¿Qué farmacias tengo que priorizar esta semana?','¿Cuáles dejaron de comprar OTC?','¿Qué zona tiene más oportunidad para Dolex?'];
+  const base=['¿Qué farmacias tengo que priorizar esta semana?','¿Cuáles dejaron de comprar OTC?','¿Qué zona tiene más oportunidad para Dolex?'];
+  return (rutaCtx()?['¿Qué tengo que mirar en cada farmacia de mi ruta?']:[]).concat(base).slice(0,3);
 }
 function openSheet(focus){ $sheet.hidden=false; $('#askCtx').textContent='Sobre: '+ctxLabel(); renderMsgs(); if(focus) setTimeout(()=>$in.focus(),30); }
 function closeSheet(){ if(ASK.sr) stopRec(true); $sheet.hidden=true; }
@@ -1066,7 +1146,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.3';
+const APP_VERSION='1.4';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
