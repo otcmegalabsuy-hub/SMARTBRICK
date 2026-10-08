@@ -894,7 +894,7 @@ function md(t){
 const hhmm=()=>{ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
 function saludo(){
   const nom=SES&&SES.rol==='vendedor'?', '+esc(SES.nombre.split(' ')[0]):'';
-  const como=vozOK()?'tocá <b>Preguntar</b>, hablá y tocá el botón rojo para enviar. También podés mantener apretado <b>Preguntar</b> mientras hablás y soltarlo al terminar.':'escribí tu pregunta abajo (podés usar el micrófono del teclado para dictarla).';
+  const como=vozOK()?(ASK.clickOnly?'tocá <b>Preguntar</b>, hablá y tocá el botón rojo para enviar.':'tocá <b>Preguntar</b>, hablá y tocá el botón rojo para enviar. También podés mantener apretado <b>Preguntar</b> mientras hablás y soltarlo al terminar.'):'escribí tu pregunta abajo (podés usar el micrófono del teclado para dictarla).';
   const off=CONFIG.asistenteUrl?'':'<p class="small"><b>Aviso:</b> el asistente todavía no está conectado; por ahora solo transcribo la pregunta.</p>';
   return `<div class="msg a"><p>Hola${nom}. Preguntame lo que necesites antes de entrar: ${como}</p>${off}</div>`;
 }
@@ -1034,23 +1034,31 @@ function stopRec(discard){
 }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&ASK.sr) stopRec(true); });
 document.addEventListener('contextmenu',e=>{ if(e.target.closest('.askbtn')) e.preventDefault(); });
+// En iPhone/iPad, Safari solo deja encender el micrófono con un toque completo: ahí se usa "tocar para hablar / tocar para enviar".
+const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+if(IOS) ASK.clickOnly=true;
 document.addEventListener('pointerdown',e=>{
   const b=e.target.closest('.askbtn'); if(!b||e.button>0) return;
-  e.preventDefault(); ASK.wasHold=false; ASK.downAt=Date.now();
-  if(ASK.sr){ ASK.pressStops=true; ASK.holding=false; return; }   // ya está escuchando: este toque termina y envía
-  ASK.pressStops=false; ASK.holding=true;
+  ASK.wasHold=false; ASK.pressStarted=false; ASK.downAt=Date.now();
+  if(ASK.sr){ ASK.pressStops=true; ASK.holding=false; return; }   // ya está escuchando: este toque termina y envía (al levantar el dedo)
+  ASK.pressStops=false;
+  if(!vozOK()||ASK.clickOnly){ ASK.holding=false; return; }      // se resuelve en el click
+  e.preventDefault(); ASK.holding=true;
   try{ b.setPointerCapture(e.pointerId); }catch(_){}
-  ASK.recording = (vozOK()&&!ASK.clickOnly) ? startRec('down') : false;
+  ASK.recording=startRec('down'); ASK.pressStarted=ASK.recording;
 });
-const endHold=()=>{ if(!ASK.holding) return; ASK.holding=false; const held=Date.now()-ASK.downAt;
-  if(held>=450){ ASK.wasHold=true; if(ASK.recording) stopRec(false); else if(!vozOK()) dictationFallback(); else openSheet(false); }
+const endHold=e=>{
+  if(ASK.pressStops){ if(e&&e.type==='pointercancel') { ASK.pressStops=false; return; } ASK.pressStops=false; ASK.swallowClick=Date.now(); stopRec(false); return; }
+  if(!ASK.holding) return; ASK.holding=false; const held=Date.now()-ASK.downAt;
+  if(held>=450){ ASK.wasHold=true; if(ASK.recording) stopRec(false); else openSheet(false); }
   ASK.recording=false; };
 document.addEventListener('pointerup',endHold); document.addEventListener('pointercancel',endHold);
 document.addEventListener('click',e=>{ const b=e.target.closest('.askbtn'); if(!b) return;
-  if(ASK.pressStops){ ASK.pressStops=false; stopRec(false); return; }
-  if(ASK.wasHold){ ASK.wasHold=false; return; }
+  if(ASK.swallowClick&&Date.now()-ASK.swallowClick<1000){ ASK.swallowClick=0; return; }
+  if(ASK.wasHold){ ASK.wasHold=false; ASK.pressStarted=false; return; }
+  if(ASK.pressStarted){ ASK.pressStarted=false; if(ASK.sr){ ASK.mode='click'; recUI(true); openSheet(false); } return; }   // toque corto: sigue escuchando hasta tocar Enviar
+  if(ASK.sr){ stopRec(false); return; }                           // teclado o un toque que no pasó por pointerup
   if(!vozOK()){ dictationFallback(); return; }
-  if(ASK.sr){ ASK.mode='click'; recUI(true); openSheet(false); return; }   // el toque ya empezó a escuchar: sigue en modo "tocar para enviar"
   openSheet(false); startRec('click');
 });
 // botón redondo del chat: si está escuchando, termina y envía; si hay texto, lo envía; si no, empieza a escuchar
@@ -1058,6 +1066,8 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
+const APP_VERSION='1.3';
+document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
