@@ -274,7 +274,22 @@ body{margin:0} img{max-width:100%} [hidden]{display:none!important}
 
 /* Armar rutas */
 .cta:disabled{opacity:.6;cursor:default}
-.rdia{font-size:15px;font-weight:700;color:#fff;margin-top:-6px}
+.rdia{font-size:16px;font-weight:700;color:#fff;scroll-margin-top:12px}
+.rcal{background:#fff;border-radius:12px;color:var(--ink);padding:10px 10px 12px}
+.cal-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cal-h b{flex:1;min-width:0;text-align:center;font-size:15.5px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.cal-nav{border:1px solid var(--line);background:#fff;border-radius:8px;width:36px;height:36px;font-size:22px;line-height:1;color:var(--ink);flex-shrink:0}
+.cal-hoy{border:1px solid #007C6B;background:#fff;color:#007C6B;border-radius:16px;height:30px;padding:0 9px;font-size:12px;font-weight:700;flex-shrink:0}
+.cal-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal-w{font-size:12px;font-weight:700;text-align:center;color:var(--muted);padding:2px 0 4px}
+.cal-w.dom,.cal-d.dom{color:#D32F2F}
+.cal-d{border:1px solid #E1E6E4;background:#fff;border-radius:8px;height:46px;font-size:16px;font-weight:600;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
+.cal-d.pas{color:#9AA4A0}.cal-d.pas.dom{color:#E39B9B}
+.cal-d.hoy{border:2px solid #007C6B}
+.cal-d[aria-pressed="true"]{background:#007C6B;border-color:#007C6B;color:#fff}
+.cal-d i{font-style:normal;font-size:10.5px;font-weight:700;line-height:1;background:#E6F3F0;color:#007C6B;border-radius:8px;padding:2px 5px}
+.cal-d[aria-pressed="true"] i{background:#fff}
+.cal-hint{margin:10px 2px 0;font-size:13.5px;color:var(--muted);text-align:center}
 .rfechas{display:flex;flex-wrap:wrap;gap:6px}
 .rchip{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:16px;min-height:34px;padding:0 12px;font-size:13.5px}
 .rchip[aria-pressed="true"]{background:#fff;color:#007C6B;font-weight:700}
@@ -356,15 +371,14 @@ body{margin:0} img{max-width:100%} [hidden]{display:none!important}
     <div class="cfg" id="cfg">
       <h3>Configuración de Visita</h3>
       <label for="cCartera" id="lCartera" hidden>Cartera de<select id="cCartera"></select></label>
-      <label for="cFecha" data-for="ruta">Fecha de la ruta<input id="cFecha" type="date"></label>
-      <div data-for="ruta" class="rdia" id="rDia" aria-live="polite"></div>
-      <div data-for="ruta" class="rfechas" id="rFechas" role="group" aria-label="Días con ruta"></div>
-      <div data-for="ruta" class="rlist" id="rLista" aria-live="polite"></div>
-      <label for="cBuscar" data-for="farm ruta">Buscar farmacia<input id="cBuscar" type="search" placeholder="Nombre de la farmacia" autocomplete="off"></label>
-      <label for="cTipo" data-for="farm ruta">Tipo de punto de venta<select id="cTipo"></select></label>
+      <div data-for="ruta" class="rcal" id="rCal"></div>
+      <div data-for="ruta" data-day="1" class="rdia" id="rDia" aria-live="polite"></div>
+      <div data-for="ruta" data-day="1" class="rlist" id="rLista" aria-live="polite"></div>
+      <label for="cBuscar" data-for="farm ruta" data-day="1">Buscar farmacia<input id="cBuscar" type="search" placeholder="Nombre de la farmacia" autocomplete="off"></label>
+      <label for="cTipo" data-for="farm ruta" data-day="1">Tipo de punto de venta<select id="cTipo"></select></label>
       <label for="cZona" data-for="zona">Zona (Brick)<select id="cZona"></select></label>
-      <div data-for="ruta" class="rlab">Farmacias a visitar <small>· tocalas en el orden de la visita</small></div>
-      <div data-for="ruta" class="rpick" id="rPick"></div>
+      <div data-for="ruta" data-day="1" class="rlab">Farmacias a visitar <small>· tocalas en el orden de la visita</small></div>
+      <div data-for="ruta" data-day="1" class="rpick" id="rPick"></div>
       <label for="cFarm" data-for="farm">Farmacia<select id="cFarm"></select></label>
       <div class="pv" id="cPrev" data-for="farm" aria-live="polite"></div>
     </div>

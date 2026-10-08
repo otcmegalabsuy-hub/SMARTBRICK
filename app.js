@@ -530,6 +530,7 @@ function renderMenu(){
   if(!L.some(f=>f.id===MST.farm)) MST.farm = L.length? L[0].id : null;
   if(MST.farm) $('#cFarm').value=MST.farm;
   $('#start').disabled=!MST.farm; $('#start').textContent='Comenzar visita';
+  $('#cfg h3').textContent = MST.mode==='ruta' ? 'Configuración de Rutas' : 'Configuración de Visita';
   if(MST.mode==='ruta') renderRuta();
   preview();
 }
@@ -568,15 +569,28 @@ function rutaSet(f,ids){
 let RUTA_NAV=null;   // ruta en curso cuando se recorre con "Comenzar ruta"
 const fById=id=>F.find(x=>x.id===id);
 function altaTxt(f){ const n=(f.alertas||[]).filter(a=>a.nivel==='alta').length; return n?` · ${n} alerta${n>1?'s':''} alta${n>1?'s':''}`:''; }
+const MESES_L=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const pad2=n=>String(n).padStart(2,'0');
+function renderCal(){
+  const hoy=isoHoy(); if(!MST.calMes) MST.calMes=(MST.fecha||hoy).slice(0,7);
+  const [y,m]=MST.calMes.split('-').map(Number), first=new Date(y,m-1,1), dias=new Date(y,m,0).getDate(), off=(first.getDay()+6)%7, all=rutasAll();
+  let h=`<div class="cal-h"><button type="button" class="cal-nav" data-cm="-1" aria-label="Mes anterior">‹</button><b>${MESES_L[m-1].toUpperCase()} ${y}</b><button type="button" class="cal-nav" data-cm="1" aria-label="Mes siguiente">›</button>${MST.calMes!==hoy.slice(0,7)||MST.fecha!==hoy?`<button type="button" class="cal-hoy" data-f="${hoy}">Hoy</button>`:''}</div>`;
+  h+='<div class="cal-g">'+['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map((d,i)=>`<span class="cal-w${i===6?' dom':''}" aria-hidden="true">${d}</span>`).join('');
+  for(let i=0;i<off;i++) h+='<span></span>';
+  for(let d=1;d<=dias;d++){
+    const iso=`${y}-${pad2(m)}-${pad2(d)}`, n=(all[iso]||[]).length, dow=(off+d-1)%7;
+    h+=`<button type="button" class="cal-d${dow===6?' dom':''}${iso===hoy?' hoy':''}${iso<hoy?' pas':''}" data-f="${iso}" aria-pressed="${iso===MST.fecha}" aria-label="${fechaLarga(iso)}${n?`: ${n} farmacia${n>1?'s':''}`:''}">${d}${n?`<i>${n}</i>`:''}</button>`;
+  }
+  h+='</div>'+(MST.fecha?'':'<p class="cal-hint">Tocá un día para armar su ruta.</p>');
+  $('#rCal').innerHTML=h;
+}
 function renderRuta(){
-  if(!MST.fecha) MST.fecha=isoHoy();
-  $('#cFecha').value=MST.fecha;
-  $('#rDia').textContent=fechaLarga(MST.fecha);
-  // accesos rápidos: hoy, mañana y días con ruta guardada
-  const hoy=isoHoy(), man=isoMan(), all=rutasAll();
-  const dias=[hoy,man,...Object.keys(all).filter(k=>k>=hoy&&k!==hoy&&k!==man).sort().slice(0,5)];
-  $('#rFechas').innerHTML=dias.map(k=>{ const n=(all[k]||[]).length; const t=k===hoy?'Hoy':k===man?'Mañana':fechaCorta(k);
-    return `<button type="button" class="rchip" data-f="${k}" aria-pressed="${k===MST.fecha}">${t}${n?` · ${n}`:''}</button>`; }).join('');
+  renderCal();
+  document.querySelectorAll('#cfg [data-day]').forEach(el=>el.hidden=!MST.fecha);
+  const st=$('#start');
+  if(!MST.fecha){ st.textContent='Elegí un día en el calendario'; st.disabled=true; return; }
+  $('#rDia').textContent='Ruta del '+fechaLarga(MST.fecha).toLowerCase().replace(',','');
+  const all=rutasAll();
   // orden de visita
   const ids=rutaGet(MST.fecha);
   $('#rLista').innerHTML = `<div class="rlh"><b>Orden de visita${ids.length?` (${ids.length})`:''}</b>${ids.length?'<button type="button" class="rvaciar" id="rVaciar">Vaciar</button>':''}</div>`+
@@ -585,19 +599,24 @@ function renderRuta(){
     : '<p class="rvacia">Todavía no hay farmacias para este día. Tocalas abajo en el orden en que las vas a visitar.</p>');
   // farmacias para elegir, agrupadas por zona
   let L=F.filter(f=>(MST.tipo==='todas'||f.tipo===MST.tipo)&&(!MST.q||f.nombre.toLowerCase().includes(MST.q)));
-  L.sort((a,b)=>(a.brick?zonaCorta(a.brick):'~').localeCompare(b.brick?zonaCorta(b.brick):'~','es')||a.nombre.localeCompare(b.nombre,'es'));
+  const zk=f=>Z[f.brick]?zonaCorta(f.brick):null;   // las farmacias sin zona van al final
+  L.sort((a,b)=>(zk(a)==null)-(zk(b)==null)||String(zk(a)||'').localeCompare(String(zk(b)||''),'es')||a.nombre.localeCompare(b.nombre,'es'));
   let h='', z=null;
-  L.forEach(f=>{ const zz=f.brick?zonaCorta(f.brick):'Sin brick asignado'; if(zz!==z){ z=zz; h+=`<div class="rzona">${esc(zz)}</div>`; }
+  L.forEach(f=>{ const zz=zk(f)||'Sin brick asignado'; if(zz!==z){ z=zz; h+=`<div class="rzona">${esc(zz)}</div>`; }
     const pos=ids.indexOf(f.id);
     h+=`<button type="button" class="rp" data-id="${esc(f.id)}" aria-pressed="${pos>=0}"><span class="rn">${pos>=0?pos+1:''}</span><span class="rt"><b>${esc(f.nombre)}</b><small>${TIPO[f.tipo]}${altaTxt(f)}</small></span></button>`; });
   $('#rPick').innerHTML = h || '<p class="rvacia" style="padding:12px">No hay farmacias con ese filtro.</p>';
-  const n=ids.length, st=$('#start');
+  const n=ids.length;
   st.textContent = n ? `Comenzar ruta (${n})` : 'Elegí las farmacias del día';
   st.disabled=!n;
 }
 function rutaToggle(id){ const ids=rutaGet(MST.fecha); const i=ids.indexOf(id); if(i>=0) ids.splice(i,1); else ids.push(id); rutaSet(MST.fecha,ids); }
-$('#cFecha').addEventListener('change',e=>{ if(e.target.value){ MST.fecha=e.target.value; renderRuta(); } });
-$('#rFechas').addEventListener('click',e=>{ const b=e.target.closest('[data-f]'); if(!b) return; MST.fecha=b.dataset.f; renderRuta(); });
+$('#rCal').addEventListener('click',e=>{
+  const nv=e.target.closest('[data-cm]'); if(nv){ const [y,m]=MST.calMes.split('-').map(Number), d=new Date(y,m-1+Number(nv.dataset.cm),1); MST.calMes=d.getFullYear()+'-'+pad2(d.getMonth()+1); renderCal(); return; }
+  const b=e.target.closest('[data-f]'); if(!b) return; const nueva=MST.fecha!==b.dataset.f;
+  MST.fecha=b.dataset.f; MST.calMes=MST.fecha.slice(0,7); renderRuta();
+  if(nueva){ try{ $('#rDia').scrollIntoView({behavior:'smooth',block:'start'}); }catch(_){} }
+});
 $('#rPick').addEventListener('click',e=>{ const b=e.target.closest('.rp'); if(!b) return; const sc=$('#rPick').scrollTop; rutaToggle(b.dataset.id); renderRuta(); $('#rPick').scrollTop=sc; });
 $('#rLista').addEventListener('click',e=>{
   if(e.target.closest('#rVaciar')){ if(confirm('¿Vaciar la ruta del '+fechaLarga(MST.fecha).toLowerCase()+'?')){ rutaSet(MST.fecha,[]); renderRuta(); } return; }
@@ -1146,7 +1165,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.4';
+const APP_VERSION='1.5';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
