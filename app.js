@@ -495,7 +495,7 @@ $('#loginForm').addEventListener('submit',async e=>{ e.preventDefault();
   }catch(err){ SES=null; sesion.set(null); lmsg(err.message||'No pude abrir los datos.',true); }
   finally{ loginBusy(false); }
 });
-$('#logout').addEventListener('click',()=>{ sesion.set(null); SES=null; D=null; cur=null; ASK.turns=[]; closeSheet(); show('login'); });
+$('#logout').addEventListener('click',()=>{ ttsStop(); sesion.set(null); SES=null; D=null; cur=null; ASK.turns=[]; closeSheet(); show('login'); });
 $('#cCartera').addEventListener('change',async e=>{ const sel=e.target; sel.disabled=true;
   try{ await cargarCartera(sel.value); renderMenu(); }
   catch(err){ alert(err.message||'No pude abrir esa cartera.'); sel.value=SES.cartera; }
@@ -541,7 +541,7 @@ function preview(){
   el.innerHTML=`<span>${TIPO[f.tipo]} · ${f.brick?'Brick '+f.brick+' · '+esc(zonaCorta(f.brick)):'Sin brick asignado'}</span>`+
     (a?`<span><i class="dot ${a.nivel}"></i><b>${esc(a.titulo)}</b></span>`:'<span><i class="dot nada"></i>Sin alertas</span>');
 }
-document.querySelectorAll('.mode').forEach(m=>m.addEventListener('click',()=>{ MST.mode=m.dataset.mode; store.set('mode',MST.mode); renderMenu(); }));
+document.querySelectorAll('.mode').forEach(m=>m.addEventListener('click',()=>{ if(MST.mode!==m.dataset.mode){ MST.q=''; $('#cBuscar').value=''; } MST.mode=m.dataset.mode; store.set('mode',MST.mode); renderMenu(); }));
 $('#cTipo').addEventListener('change',e=>{ MST.tipo=e.target.value; store.set('tipo',MST.tipo); renderMenu(); });
 $('#cZona').addEventListener('change',e=>{ MST.zona=e.target.value; store.set('zonaSel',MST.zona); renderMenu(); });
 $('#cBuscar').addEventListener('input',e=>{ MST.q=e.target.value.trim().toLowerCase(); renderMenu(); });
@@ -667,7 +667,7 @@ const RES_ALERTA={
   alto_prom:['Venden más que la sucursal promedio', a=>a.titulo.replace(/^Vende /,'').replace(' que la sucursal promedio','')]
 };
 const ORD_NIV={alta:0,media:1,positiva:2};
-function panorama(ids){
+function panoramaGrupos(ids){
   const grupos={};
   ids.forEach((id,i)=>{ const f=fById(id);
     (f.alertas||[]).forEach(a=>{ const g=RES_ALERTA[a.tipo]; if(!g) return;
@@ -675,11 +675,14 @@ function panorama(ids){
       if(ORD_NIV[a.nivel]<ORD_NIV[G.nivel]) G.nivel=a.nivel;
       const it=G.items[id]||(G.items[id]={i,f,txt:[]}); it.txt.push(g[1](a)); }); });
   return Object.values(grupos).sort((a,b)=>ORD_NIV[a.nivel]-ORD_NIV[b.nivel]||Object.keys(b.items).length-Object.keys(a.items).length)
-    .map(G=>`<div class="rr-it">${pillA(G.nivel)}<div><b>${esc(G.label)}</b><p>${Object.values(G.items).sort((a,b)=>a.i-b.i).map(it=>`<span class="rr-num">${it.i+1}</span>${esc(it.f.nombre)} (${esc(it.txt.join(', '))})`).join(' · ')}</p></div></div>`).join('');
+    .map(G=>Object.assign(G,{lista:Object.values(G.items).sort((a,b)=>a.i-b.i)}));
 }
-function zonaCard(b,items){
+function panorama(ids){
+  return panoramaGrupos(ids).map((G,gi)=>`<div class="rr-it" data-say="g${gi}">${pillA(G.nivel)}<div><b>${esc(G.label)}</b><p>${G.lista.map(it=>`<span class="rr-num">${it.i+1}</span>${esc(it.f.nombre)} (${esc(it.txt.join(', '))})`).join(' · ')}</p></div></div>`).join('');
+}
+function zonaCard(b,items,zi){
   const nums=items.map(({f,i})=>`<span class="rr-num">${i+1}</span>${esc(f.nombre)}`).join('<br>');
-  if(b==='sin') return `<div class="rr-z"><div class="rr-zh"><b>Sin brick asignado</b></div><p class="rr-f">${nums}</p><p class="small" style="margin:0">No hay datos de mercado de CloseUp para estos puntos de venta.</p></div>`;
+  if(b==='sin') return `<div class="rr-z" data-say="z${zi}"><div class="rr-zh"><b>Sin brick asignado</b></div><p class="rr-f">${nums}</p><p class="small" style="margin:0">No hay datos de mercado de CloseUp para estos puntos de venta.</p></div>`;
   const z=Z[b], sm=z.share_meg, sc=D.share_cartera, dif=sm-sc;
   const brands=[]; (z.cats||[]).forEach(c=>(c.marcas||[]).forEach(m=>{ if((m.venta||0)>0) brands.push(Object.assign({cat:c},m)); }));
   brands.sort((a,c)=>c.venta-a.venta);
@@ -690,7 +693,7 @@ function zonaCard(b,items){
   else { const rs=brands.map(m=>m.cat.riser).filter(Boolean).sort((a,c)=>c.delta_pp-a.delta_pp)[0];
     if(rs) riesgo=`<div class="rr-it">${pillA('media')}<p>Competidor que más crece: <b>${esc(rs.producto)}</b> (${esc(rs.corp)}, ${pp(rs.delta_pp)}).</p></div>`; }
   const cad=((z.cadenas&&z.cadenas.sucursales)||[]).filter(s=>!items.some(({f})=>f.id===s.id)).slice(0,3);
-  return `<div class="rr-z"><div class="rr-zh"><b>${esc(zonaCorta(b))}</b><small>Brick ${b} · ${esc(zonaDepto(b))}</small></div>
+  return `<div class="rr-z" data-say="z${zi}"><div class="rr-zh"><b>${esc(zonaCorta(b))}</b><small>Brick ${b} · ${esc(zonaDepto(b))}</small></div>
     <p class="rr-f">${nums}</p>
     <div class="rr-share"><span class="l">Share de Megalabs OTC en la zona</span><span class="v num">${nf1.format(sm)}%</span><span class="s num"><span class="${cls(dif)}">${pp(dif)}</span> contra el promedio de tu cartera (${nf1.format(sc)}%)</span></div>
     ${top?`<div><span class="small">Marcas de Megalabs que más venden en la zona (share año móvil)</span><ul class="rr-ul">${top}</ul></div>`:''}
@@ -700,7 +703,7 @@ function zonaCard(b,items){
 }
 function farmCard(f,i){
   const A=f.alertas||[], ped=f.pedido||[];
-  return `<div class="rr-card"><div class="rr-ch"><span class="rn">${i+1}</span><div class="rt"><b>${esc(f.nombre)}</b><small>${TIPO[f.tipo]} · ${Z[f.brick]?esc(zonaCorta(f.brick)):'Sin brick asignado'}</small></div><button type="button" class="rr-ver" data-ri="${i}">Ver ficha ›</button></div>
+  return `<div class="rr-card" data-say="f${i}"><div class="rr-ch"><span class="rn">${i+1}</span><div class="rt"><b>${esc(f.nombre)}</b><small>${TIPO[f.tipo]} · ${Z[f.brick]?esc(zonaCorta(f.brick)):'Sin brick asignado'}</small></div><button type="button" class="rr-ver" data-ri="${i}">Ver ficha ›</button></div>
     <p class="rr-k">${kpiLine(f)}</p>
     ${A.length?`<div class="rr-al">${A.map(a=>`<div class="rr-a">${pillA(a.nivel)}<div><b>${esc(a.titulo)}</b><p>${esc(a.detalle)} <em>${esc(a.fuente)}</em></p></div></div>`).join('')}</div>`:'<p class="small" style="margin:0">Sin alertas para este punto de venta.</p>'}
     ${ped.length?`<div class="rr-ped"><span class="small">Pedido sugerido</span>${ped.slice(0,3).map(q=>`<div><span class="kind ${q.tipo}">${KIND[q.tipo]||q.tipo}</span>${esc(P[q.art].n)}${q.cant!=null?` <b>x${q.cant}</b>`:''}</div>`).join('')}${ped.length>3?`<span class="small">y ${ped.length-3} más en la ficha</span>`:''}</div>`:''}
@@ -726,10 +729,10 @@ function renderRutaRes(){
       <div class="kpi"><span class="l">Pedido sugerido</span><span class="v num">${ped.length}</span><span class="s">producto${ped.length===1?'':'s'} en total</span></div>
     </div>`;
   const pan=panorama(R.ids);
-  h+=`<section class="sec"><div class="sec-h"><h2>Qué mirar en esta ruta</h2><span class="src">Resumen de todas las paradas</span></div>
+  h+=`<section class="sec"><div class="sec-h"><h2>Qué mirar en esta ruta</h2>${btnEscuchar('ruta')}</div><span class="src" style="margin-top:-6px">Resumen de todas las paradas</span>
       ${pan?`<div class="rr-items">${pan}</div>`:'<p class="small" style="margin:0">Ninguna farmacia de la ruta tiene alertas.</p>'}
       ${ped.length?`<div class="rr-it">${pillA('positiva').replace('Bien','Pedido')}<div><b>Pedido sugerido para la ruta</b><p>${esc(pedTxt)}</p></div></div>`:''}</section>`;
-  h+=`<section class="sec"><div class="sec-h"><h2>Contexto de las zonas</h2><span class="src">CloseUp · año móvil a jul-26</span></div>${[...zonas.entries()].map(([b,items])=>zonaCard(b,items)).join('')}</section>`;
+  h+=`<section class="sec"><div class="sec-h"><h2>Contexto de las zonas</h2><span class="src">CloseUp · año móvil a jul-26</span></div>${[...zonas.entries()].map(([b,items],zi)=>zonaCard(b,items,zi)).join('')}</section>`;
   h+=`<h2 class="mhead">Farmacia por farmacia</h2>${fs.map((f,i)=>farmCard(f,i)).join('')}`;
   h+=`<button class="cta" id="rrGo">Ver farmacia por farmacia ›</button>`;
   $('#rres').innerHTML=h+fuentes();
@@ -738,6 +741,159 @@ $('#rres').addEventListener('click',e=>{
   const v=e.target.closest('[data-ri]'); if(v&&RUTA_NAV){ RUTA_NAV.idx=Number(v.dataset.ri); openFicha(RUTA_NAV.ids[RUTA_NAV.idx]); return; }
   if(e.target.closest('#rrGo')&&RUTA_NAV){ RUTA_NAV.idx=0; openFicha(RUTA_NAV.ids[0]); }
 });
+
+// ---- Escuchar: lee en voz alta "Qué mirar antes de entrar" (ficha) y el resumen de la ruta, como un podcast.
+// Usa la voz del propio teléfono (sin costo ni conexión). Se reproduce por frases para poder pausar, seguir y marcar lo que se lee.
+const SYN = ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) ? window.speechSynthesis : null;
+const TTS = { segs: [], i: 0, playing: false, done: false, label: '', key: '', gen: 0, rate: Number(store.get('ttsRate', 1)) || 1 };
+const ICO_SPK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"></path><path d="M15.5 9a4 4 0 0 1 0 6"></path><path d="M18.5 6.5a7.5 7.5 0 0 1 0 11"></path></svg>';
+const ICO_PLAY = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"></path></svg>';
+const ICO_PAUSE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1"></rect><rect x="13.5" y="5" width="4" height="14" rx="1"></rect></svg>';
+const btnEscuchar = key => SYN ? `<button type="button" class="escuchar" data-tts="${key}">${ICO_SPK}<span>${TTS.key === key && TTS.segs.length ? (TTS.playing ? 'Pausar' : 'Seguir') : 'Escuchar'}</span></button>` : '';
+// reproductor fijo abajo (persiste al cambiar de pantalla)
+(function () {
+  if (!SYN) return;
+  document.body.insertAdjacentHTML('beforeend', `<div class="ttsbar" id="ttsBar" hidden><button type="button" class="tts-p" id="ttsPlay" aria-label="Pausar"></button><div class="tts-t"><b id="ttsTit"></b><small id="ttsSub"></small></div><button type="button" class="tts-r" id="ttsRate" aria-label="Velocidad de lectura"></button><button type="button" class="tts-x" id="ttsStop" aria-label="Cerrar audio">✕</button></div>`);
+  const st = document.createElement('style');
+  st.textContent = `.green-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.escuchar{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 12px;border-radius:19px;border:1.5px solid currentColor;background:transparent;font-size:14px;font-weight:700;flex-shrink:0}
+.green .escuchar{color:#fff;border-color:rgba(255,255,255,.85)}
+.sec .escuchar{color:#007C6B}
+.ttsbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:20;width:min(94vw,540px);display:flex;align-items:center;gap:10px;background:#1E2523;color:#fff;border-radius:16px;padding:8px 8px 8px 10px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.tts-p{width:44px;height:44px;border-radius:50%;border:0;background:#00B394;color:#fff;display:grid;place-items:center;flex-shrink:0}
+.tts-t{flex:1;min-width:0}.tts-t b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tts-t small{display:block;font-size:12px;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tts-r{border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;border-radius:14px;height:32px;min-width:46px;font-size:13px;font-weight:700;flex-shrink:0}
+.tts-x{border:0;background:transparent;color:#fff;width:36px;height:36px;font-size:16px;flex-shrink:0}
+.say-on{outline:3px solid #FFC94D;outline-offset:2px;border-radius:10px}`;
+  document.head.appendChild(st);
+  $('#ttsPlay').addEventListener('click', () => { if (TTS.playing) ttsPause(); else if (TTS.done) ttsFrom(0); else ttsFrom(TTS.i); });
+  $('#ttsStop').addEventListener('click', ttsStop);
+  $('#ttsRate').addEventListener('click', () => { const R = [1, 1.2, 1.5, 0.85]; TTS.rate = R[(R.indexOf(TTS.rate) + 1) % R.length]; store.set('ttsRate', TTS.rate); if (TTS.playing) ttsFrom(TTS.i); else ttsUI(); });
+  if (SYN.onvoiceschanged !== undefined) SYN.onvoiceschanged = () => {};
+})();
+function ttsVoice() {
+  const vs = SYN.getVoices() || [], norm = l => String(l || '').replace('_', '-').toLowerCase();
+  for (const l of ['es-uy', 'es-ar', 'es-419', 'es-us', 'es-mx', 'es-es']) { const v = vs.find(x => norm(x.lang) === l); if (v) return v; }
+  return vs.find(x => /^es/i.test(x.lang)) || null;
+}
+function ttsFrom(i) {
+  if (!SYN || !TTS.segs.length) return;
+  if (typeof ASK !== 'undefined' && ASK.sr) stopRec(true);              // no grabar la propia voz del teléfono
+  TTS.gen++; const gen = TTS.gen; SYN.cancel();
+  TTS.i = i; TTS.playing = true; TTS.done = false;
+  const v = ttsVoice();
+  for (let k = i; k < TTS.segs.length; k++) {
+    const u = new SpeechSynthesisUtterance(TTS.segs[k].t);
+    u.lang = v ? v.lang : 'es-UY'; if (v) u.voice = v; u.rate = TTS.rate;
+    u.onstart = () => { if (gen !== TTS.gen) return; TTS.i = k; ttsMark(); ttsUI(); };
+    if (k === TTS.segs.length - 1) u.onend = () => { if (gen !== TTS.gen) return; TTS.playing = false; TTS.done = true; TTS.i = 0; ttsMark(true); ttsUI(); };
+    SYN.speak(u);
+  }
+  ttsUI();
+}
+function ttsPause() { TTS.gen++; if (SYN) SYN.cancel(); TTS.playing = false; ttsUI(); }
+function ttsStop() { TTS.gen++; if (SYN) SYN.cancel(); TTS.playing = false; TTS.done = false; TTS.segs = []; TTS.key = ''; ttsMark(true); ttsUI(); }
+function trocear(t) { const fr = String(t).match(/[^.;:]+[.;:]*/g) || [t], out = []; let cur = '';
+  fr.forEach(x => { x = x.trim(); if (!x) return; if ((cur + ' ' + x).length > 200 && cur) { out.push(cur); cur = x; } else cur = cur ? cur + ' ' + x : x; });
+  if (cur) out.push(cur); return out; }
+function ttsPlay(key, label, segs) { segs = segs.flatMap(s => trocear(s.t).map(t => ({ t, sel: s.sel }))); if (!segs.length) return; TTS.key = key; TTS.label = label; TTS.segs = segs; ttsFrom(0); }
+function ttsMark(clear) {
+  document.querySelectorAll('.say-on').forEach(e => e.classList.remove('say-on'));
+  if (clear) return; const s = TTS.segs[TTS.i]; if (!s || !s.sel) return;
+  const el = document.querySelector(s.sel); if (el && !el.closest('[hidden]')) el.classList.add('say-on');
+}
+function ttsUI() {
+  if (!SYN) return;
+  const bar = $('#ttsBar'), on = TTS.segs.length > 0;
+  bar.hidden = !on; document.body.style.paddingBottom = on ? '84px' : '';
+  document.querySelectorAll('.escuchar').forEach(b => { const s = b.querySelector('span'); s.textContent = (on && b.dataset.tts === TTS.key) ? (TTS.playing ? 'Pausar' : 'Seguir') : 'Escuchar'; });
+  if (!on) return;
+  $('#ttsPlay').innerHTML = TTS.playing ? ICO_PAUSE : ICO_PLAY; $('#ttsPlay').setAttribute('aria-label', TTS.playing ? 'Pausar' : 'Reproducir');
+  $('#ttsTit').textContent = TTS.label;
+  $('#ttsSub').textContent = TTS.done ? 'Terminado · tocá ▶ para escuchar de nuevo' : (TTS.playing ? 'Escuchando' : 'En pausa') + ` · ${Math.min(TTS.i + 1, TTS.segs.length)} de ${TTS.segs.length}`;
+  $('#ttsRate').textContent = String(TTS.rate).replace('.', ',') + 'x';
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.escuchar'); if (!b) return;
+  const key = b.dataset.tts;
+  if (TTS.key === key && TTS.segs.length) { if (TTS.playing) ttsPause(); else ttsFrom(TTS.done ? 0 : TTS.i); return; }
+  if (key === 'ruta' && RUTA_NAV) ttsPlay('ruta', 'Ruta del ' + fechaLarga(RUTA_NAV.fecha).toLowerCase().replace(',', ''), guionRuta());
+  else if (key.startsWith('farm') && cur) ttsPlay(key, cur.nombre, guionFarmacia(cur));
+});
+// ---- textos para leer en voz alta
+function hablar(s) {
+  return String(s == null ? '' : s)
+    .replace(/\bFCIA\.?\s*/gi, 'Farmacia ').replace(/\bN°\s*/g, 'número ')
+    .replace(/\bOTC\b/g, 'O T C').replace(/([+\-−])?(\d+(?:[.,]\d+)?)\s?pp\b/g, (m, sg, n) => (sg === '-' || sg === '−' ? 'menos ' : sg === '+' ? 'más ' : '') + n + ' puntos')
+    .replace(/([+\-−])?(\d+(?:[.,]\d+)?)\s?%/g, (m, sg, n) => (sg === '-' || sg === '−' ? 'menos ' : sg === '+' ? 'más ' : '') + n + ' por ciento')
+    .replace(/\$\s?(\d+(?:,\d+)?)\s?M\b/g, '$1 millones de pesos').replace(/\$\s?(\d+(?:\.\d+)?)\s?mil\b/g, '$1 mil pesos').replace(/\$\s?([\d.]+)/g, '$1 pesos')
+    .replace(/\bunid\./g, 'unidades').replace(/\bprod\./g, 'productos').replace(/\bvs\.?\s/g, 'contra ').replace(/\bpdv\b/g, 'puntos de venta')
+    .replace(/([a-záéíóú])–([a-záéíóú])/gi, '$1 a $2').replace(/\s+-\s+/g, ', ').replace(/([a-záéíóúñ])-([a-záéíóúñ])/gi, '$1 $2').replace(/([a-záéíóú])\/([a-záéíóú])/gi, '$1 y $2')
+    .replace(/\b[xX]\s?(\d)/g, 'por $1').replace(/\bmg\b/gi, 'miligramos').replace(/\bml\b/gi, 'mililitros').replace(/\b(\d+)\s?gr?\b\.?/g, '$1 gramos')
+    .replace(/\bcomp\b\.?/gi, 'comprimidos').replace(/\bcaps\b\.?/gi, 'cápsulas').replace(/\bsob\b\.?/gi, 'sobres')
+    .replace(/\b([A-ZÁÉÍÓÚÑ]{3,})\b/g, w => ['IVA', 'MAM'].includes(w) ? w : w.charAt(0) + w.slice(1).toLowerCase())
+    .replace(/\b1 productos\b/g, '1 producto').replace(/\b1 días\b/g, '1 día')
+    .replace(/·/g, ',').replace(/\s+/g, ' ').trim();
+}
+const NIV_H = { alta: 'Prioridad alta', media: 'Prioridad media', positiva: 'Una buena noticia' };
+const dinero = v => v == null ? '' : Math.abs(v) >= 1e6 ? nf1.format(v / 1e6) + ' millones de pesos' : Math.abs(v) >= 1e3 ? nf0.format(v / 1e3) + ' mil pesos' : nf0.format(v) + ' pesos';
+const pctH = (v, mas, menos) => v == null ? '' : nf0.format(Math.abs(v)) + ' por ciento ' + (v >= 0 ? mas : menos);
+const diasH = d => d === 1 ? 'hace un día' : 'hace ' + d + ' días';
+function kpiHablado(f) {
+  if (f.sin_datos) return 'No tiene compras registradas en Venta Real desde enero de 2025.';
+  const k = f.kpi || {};
+  if (esFarmacia(f)) return `En lo que va de 2026 compró ${dinero(k.otc_ytd26)} en productos O T C${k.otc_var != null ? ', ' + pctH(k.otc_var, 'más', 'menos') + ' que en 2025' : ''}.${k.dias_otc != null ? ' La última compra fue ' + diasH(k.dias_otc) + '.' : ''}`;
+  return `En agosto vendió ${nf0.format(k.unid || 0)} unidades de productos O T C de Megalabs. Está en el puesto ${k.rank} de ${k.n_suc} sucursales de ${TIPO[f.tipo]}.`;
+}
+function guionFarmacia(f) {
+  const A = f.alertas || [], S = [];
+  S.push({ t: hablar(`${f.nombre}. ${TIPO[f.tipo]}${Z[f.brick] ? ', en ' + zonaCorta(f.brick) : ''}.`) });
+  S.push({ t: hablar(kpiHablado(f)), sel: '#fpanel .kpis' });
+  if (!A.length) S.push({ t: 'No hay alertas para este punto de venta.' });
+  else {
+    S.push({ t: A.length === 1 ? 'Antes de entrar, hay una cosa para mirar.' : `Antes de entrar, hay ${A.length} cosas para mirar.` });
+    A.forEach((a, ai) => S.push({ t: hablar(`${NIV_H[a.nivel] || ''}. ${a.titulo}. ${a.detalle}`), sel: `#fpanel .gitem[data-say="a${ai}"]` }));
+  }
+  const ped = f.pedido || [];
+  if (ped.length) S.push({ t: hablar(`El pedido sugerido tiene ${ped.length} producto${ped.length > 1 ? 's' : ''}. Los primeros: ` + ped.slice(0, 3).map(q => `${(KIND[q.tipo] || q.tipo).toLowerCase()} ${P[q.art].n}${q.cant != null ? ', ' + q.cant + ' unidades' : ''}`).join('; ') + '.') });
+  S.push({ t: 'Eso es todo para este punto de venta. Buena visita.' });
+  return S;
+}
+function guionRuta() {
+  const R = RUTA_NAV, fs = R.ids.map(fById), S = [];
+  const zonas = new Map(); R.ids.forEach((id, i) => { const f = fById(id), b = zonaDe(f); if (!zonas.has(b)) zonas.set(b, []); zonas.get(b).push({ f, i }); });
+  const al = fs.flatMap(f => f.alertas || []), altas = al.filter(a => a.nivel === 'alta').length, medias = al.filter(a => a.nivel === 'media').length;
+  const ped = fs.flatMap(f => f.pedido || []);
+  const ind = fs.filter(f => esFarmacia(f) && !f.sin_datos && f.kpi), c26 = ind.reduce((s, f) => s + (f.kpi.otc_ytd26 || 0), 0), c25 = ind.reduce((s, f) => s + (f.kpi.otc_ytd25 || 0), 0);
+  S.push({ t: hablar(`Resumen de la ruta del ${fechaLarga(R.fecha).toLowerCase().replace(',', '')}: ${fs.length} puntos de venta en ${zonas.size} zona${zonas.size > 1 ? 's' : ''}.`), sel: '#rres .rr-head' });
+  S.push({ t: hablar(`Hay ${altas} alerta${altas === 1 ? '' : 's'} de prioridad alta y ${medias} de prioridad media. El pedido sugerido suma ${ped.length} productos.` + (ind.length ? ` Las farmacias de la ruta llevan compradas ${dinero(c26)} en 2026${c25 ? ', ' + pctH(gr(c26, c25), 'más', 'menos') + ' que en 2025' : ''}.` : '')), sel: '#rres .kpis' });
+  const G = panoramaGrupos(R.ids);
+  if (G.length) {
+    S.push({ t: 'Lo más importante de la ruta.' });
+    G.forEach((g, gi) => S.push({ t: hablar(`${NIV_H[g.nivel]}. ${g.label}: ` + g.lista.map(it => `parada ${it.i + 1}, ${it.f.nombre}, ${it.txt.join(', ')}`).join('; ') + '.'), sel: `#rres .rr-it[data-say="g${gi}"]` }));
+  }
+  S.push({ t: 'Ahora, el contexto de las zonas.' });
+  [...zonas.entries()].forEach(([b, items], zi) => {
+    const paradas = items.map(({ i }) => i + 1).join(' y ');
+    if (b === 'sin') { S.push({ t: `Parada${items.length > 1 ? 's' : ''} ${paradas}: sin datos de mercado de su zona.`, sel: `#rres .rr-z[data-say="z${zi}"]` }); return; }
+    const z = Z[b], dif = z.share_meg - D.share_cartera;
+    const brands = []; (z.cats || []).forEach(c => (c.marcas || []).forEach(m => { if ((m.venta || 0) > 0) brands.push(Object.assign({ cat: c }, m)); }));
+    const baja = brands.filter(m => m.share >= 3 && m.delta_pp <= -1).sort((a, c) => a.delta_pp - c.delta_pp)[0];
+    let t = `${zonaCorta(b)}, parada${items.length > 1 ? 's' : ''} ${paradas}. El share de Megalabs O T C en la zona es ${nf1.format(z.share_meg)} por ciento, ${nf1.format(Math.abs(dif))} puntos ${dif >= 0 ? 'por encima' : 'por debajo'} del promedio de tu cartera.`;
+    if (baja) t += ` Atención: ${marca(baja.marca)} pierde ${nf1.format(Math.abs(baja.delta_pp))} puntos en ${catName(baja.cat.cat).toLowerCase()}` + (baja.cat.riser ? `; el que más gana es ${baja.cat.riser.producto}.` : '.');
+    S.push({ t: hablar(t), sel: `#rres .rr-z[data-say="z${zi}"]` });
+  });
+  S.push({ t: 'Y ahora, farmacia por farmacia.' });
+  fs.forEach((f, i) => {
+    const A = (f.alertas || []).slice().sort((a, b) => ORD_NIV[a.nivel] - ORD_NIV[b.nivel]);
+    let t = `Parada ${i + 1}: ${f.nombre}. ${kpiHablado(f)} `;
+    t += A.length ? A.map(a => `${NIV_H[a.nivel]}: ${a.titulo}.`).join(' ') : 'No tiene alertas.';
+    if ((f.pedido || []).length) t += ` Pedido sugerido: ${f.pedido.length} producto${f.pedido.length > 1 ? 's' : ''}.`;
+    S.push({ t: hablar(t), sel: `#rres .rr-card[data-say="f${i}"]` });
+  });
+  S.push({ t: 'Fin del resumen de la ruta. Buena jornada.' });
+  return S;
+}
 
 
 // ---- 3 · Farmacia
@@ -768,7 +924,7 @@ function renderFarmTab(){
 const fuentes=()=>`<div class="foot"><span>Fuentes: Venta Real (al ${D.corte.venta_real}) · CloseUp Bricks (${D.corte.closeup}) · Sell-Out Farmashop y San Roque (${D.corte.cadenas})</span><span>Cartera de ${esc(D.vendedor)}${SES&&SES.rol!=='vendedor'?' · vista de '+esc(SES.nombre):''}</span></div>`;
 function greenPanel(f){
   const A=f.alertas||[], lbl={alta:'Alta',media:'Media',positiva:'Bien'};
-  return `<section class="green"><h2>Qué mirar antes de entrar</h2>${A.length?A.map(a=>`<div class="gitem"><span class="gpill ${a.nivel}">${lbl[a.nivel]}</span><b>${esc(a.titulo)}</b><p>${esc(a.detalle)} <em>${esc(a.fuente)}</em></p></div>`).join(''):'<p class="gempty">No hay alertas para este punto de venta.</p>'}</section>`;
+  return `<section class="green"><div class="green-h"><h2>Qué mirar antes de entrar</h2>${btnEscuchar('farm:'+f.id)}</div>${A.length?A.map((a,ai)=>`<div class="gitem" data-say="a${ai}"><span class="gpill ${a.nivel}">${lbl[a.nivel]}</span><b>${esc(a.titulo)}</b><p>${esc(a.detalle)} <em>${esc(a.fuente)}</em></p></div>`).join(''):'<p class="gempty">No hay alertas para este punto de venta.</p>'}</section>`;
 }
 const BTN_MARCAS=`<button class="bigbtn" id="analizar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-7M2 20h20"></path></svg>Analizar por marcas</button>`;
 function resumenV2(f){
@@ -1181,6 +1337,7 @@ function recUI(on){
 }
 function startRec(src){
   if(!vozOK()) return false;
+  if(TTS.playing) ttsPause();   // no grabar la lectura en voz alta
   if(ASK.sr) return true;
   let rec; try{ rec=new SR(); }catch(e){ ASK.srBlocked=true; return false; }
   ASK.sr=rec; ASK.mode=src; ASK.recTxt=''; ASK.discard=false; ASK.userTyped=false; ASK.gotResult=false; ASK.recStart=Date.now();
@@ -1263,7 +1420,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.6';
+const APP_VERSION='1.7';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
