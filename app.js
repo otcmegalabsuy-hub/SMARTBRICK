@@ -385,7 +385,7 @@ function copiarPedido(){
 }
 
 // ================= Navegación por pantallas =================
-const SCREENS=['carga','login','menu','farm','marca'];
+const SCREENS=['carga','login','menu','ruta','farm','marca'];
 let screen='login';
 function show(s, push){
   SCREENS.forEach(k=>{ document.getElementById('s-'+k).hidden = (k!==s); });
@@ -393,7 +393,7 @@ function show(s, push){
   if(push!==false){ try{ history.pushState({s}, ''); }catch(e){} }
   syncAskBar();
 }
-window.addEventListener('popstate', e=>{ const s=e.state&&e.state.s; if(!s) return; if(s!=='login' && !logged()) return show('login',false); if(s==='farm'&&!cur) return show('menu',false); show(s,false); if(s==='farm') renderFarm(); if(s==='marca'&&cur) renderMarca(); });
+window.addEventListener('popstate', e=>{ const s=e.state&&e.state.s; if(!s) return; if(s!=='login' && !logged()) return show('login',false); if(s==='farm'&&!cur) return show('menu',false); show(s,false); if(s==='farm') renderFarm(); if(s==='marca'&&cur) renderMarca(); if(s==='ruta'){ if(RUTA_NAV) renderRutaRes(); else { renderMenu(); show('menu',false); } } });
 document.addEventListener('click', e=>{ const n=e.target.closest('[data-nav]'); if(!n) return; const s=n.dataset.nav; if(s==='menu'){ renderMenu(); show('menu'); } else if(s==='farm'){ show('farm'); renderFarm(); } });
 
 // ================= Sesión y datos cifrados =================
@@ -547,7 +547,7 @@ $('#cZona').addEventListener('change',e=>{ MST.zona=e.target.value; store.set('z
 $('#cBuscar').addEventListener('input',e=>{ MST.q=e.target.value.trim().toLowerCase(); renderMenu(); });
 $('#cFarm').addEventListener('change',e=>{ MST.farm=e.target.value; preview(); });
 $('#start').addEventListener('click',()=>{
-  if(MST.mode==='ruta'){ const ids=rutaGet(MST.fecha); if(ids.length){ RUTA_NAV={fecha:MST.fecha, ids, idx:0}; openFicha(ids[0]); } return; }
+  if(MST.mode==='ruta'){ const ids=rutaGet(MST.fecha); if(ids.length){ RUTA_NAV={fecha:MST.fecha, ids, idx:0}; show('ruta'); renderRutaRes(); } return; }
   RUTA_NAV=null; if(MST.farm) openFicha(MST.farm); });
 
 // ---- Armar rutas: el vendedor elige un día y toca las farmacias en el orden en que las va a visitar.
@@ -630,10 +630,10 @@ function renderRutaBar(){
   if(!R||!cur||R.ids[R.idx]!==cur.id){ el.hidden=true; return; }
   const n=R.ids.length, i=R.idx, next=i<n-1?fById(R.ids[i+1]):null;
   el.hidden=false;
-  el.innerHTML=`<div class="rb-t"><b>Ruta · ${esc(fechaCorta(R.fecha))} · parada ${i+1} de ${n}</b><small>${next?'Siguiente: '+esc(next.nombre):'Última parada de la ruta'}</small></div>
+  el.innerHTML=`<div class="rb-t"><b>Ruta · ${esc(fechaCorta(R.fecha))} · parada ${i+1} de ${n}</b><small>${next?'Siguiente: '+esc(next.nombre):'Última parada de la ruta'}</small><button type="button" class="rb-res" data-rres="1">Ver resumen de la ruta</button></div>
     <div class="rb-b"><button type="button" class="rbn" data-rn="-1" ${i?'':'disabled'} aria-label="Farmacia anterior">‹</button><button type="button" class="rbn" data-rn="1" ${next?'':'disabled'}>Siguiente ›</button></div>`;
 }
-$('#rutaBar').addEventListener('click',e=>{ const b=e.target.closest('[data-rn]'); if(!b||!RUTA_NAV) return;
+$('#rutaBar').addEventListener('click',e=>{ if(e.target.closest('[data-rres]')&&RUTA_NAV){ show('ruta'); renderRutaRes(); return; } const b=e.target.closest('[data-rn]'); if(!b||!RUTA_NAV) return;
   const j=RUTA_NAV.idx+Number(b.dataset.rn); if(j<0||j>=RUTA_NAV.ids.length) return; RUTA_NAV.idx=j; openFicha(RUTA_NAV.ids[j]); });
 // contexto para el asistente
 function rutaCtx(){
@@ -642,6 +642,102 @@ function rutaCtx(){
   if(!ids.length) return '';
   return `Ruta planificada para el ${fechaLarga(dia).toLowerCase()} (en orden de visita): ${ids.map((id,i)=>{ const x=fById(id); return `${i+1}. ${x.nombre} (id ${x.id})`; }).join('; ')}.\n`;
 }
+
+// ---- Resumen de la ruta: pantalla intermedia antes de ver farmacia por farmacia
+const NIVEL={alta:'Alta',media:'Media',positiva:'Bien'};
+const pillA=n=>`<span class="apill ${n}">${NIVEL[n]||n}</span>`;
+const zonaDe=f=>Z[f.brick]?String(f.brick):'sin';
+function kpiLine(f){
+  if(f.sin_datos) return 'Sin compras registradas en Venta Real desde enero de 2025.';
+  const k=f.kpi||{};
+  if(esFarmacia(f)) return `Compras OTC 2026: <b>${moneyC(k.otc_ytd26)}</b> <span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. 2025 · última compra ${k.dias_otc==null?'–':'hace '+k.dias_otc+(k.dias_otc===1?' día':' días')}`;
+  return `Sell-out agosto: <b>${n0(k.unid)} unid.</b> · índice ${k.indice==null?'–':k.indice} · puesto ${k.rank} de ${k.n_suc}`;
+}
+// resumen corto de cada alerta para la vista unificada
+const RES_ALERTA={
+  dejo:['Dejaron de comprar productos', a=>(a.titulo.match(/\d+/)||[''])[0]+' prod.'],
+  sin_compra:['Sin compras OTC hace más de 30 días', a=>(a.titulo.match(/\d+/)||[''])[0]+' días'],
+  caida:['Compras en baja', a=>a.titulo.replace(/^Compras OTC /,'')],
+  quiebre:['Productos sin stock', a=>(a.titulo.match(/\d+/)||[''])[0]+' prod.'],
+  sin_rotacion:['Con stock y sin ventas (revisar exhibición)', a=>(a.titulo.match(/\d+/)||[''])[0]+' prod.'],
+  sin_venta:['Productos sin ventas en agosto', a=>(a.titulo.match(/\d+/)||[''])[0]+' prod.'],
+  bajo_prom:['Venden menos que la sucursal promedio', a=>a.titulo.replace(/^Vende /,'').replace(' que la sucursal promedio','')],
+  surtido:['Marcas que pesan menos que en su zona', a=>a.titulo.split(':')[0]],
+  crece:['Vienen creciendo', a=>a.titulo.replace(/^Compras OTC /,'')],
+  alto_prom:['Venden más que la sucursal promedio', a=>a.titulo.replace(/^Vende /,'').replace(' que la sucursal promedio','')]
+};
+const ORD_NIV={alta:0,media:1,positiva:2};
+function panorama(ids){
+  const grupos={};
+  ids.forEach((id,i)=>{ const f=fById(id);
+    (f.alertas||[]).forEach(a=>{ const g=RES_ALERTA[a.tipo]; if(!g) return;
+      const G=grupos[a.tipo]||(grupos[a.tipo]={tipo:a.tipo,label:g[0],nivel:a.nivel,items:{}});
+      if(ORD_NIV[a.nivel]<ORD_NIV[G.nivel]) G.nivel=a.nivel;
+      const it=G.items[id]||(G.items[id]={i,f,txt:[]}); it.txt.push(g[1](a)); }); });
+  return Object.values(grupos).sort((a,b)=>ORD_NIV[a.nivel]-ORD_NIV[b.nivel]||Object.keys(b.items).length-Object.keys(a.items).length)
+    .map(G=>`<div class="rr-it">${pillA(G.nivel)}<div><b>${esc(G.label)}</b><p>${Object.values(G.items).sort((a,b)=>a.i-b.i).map(it=>`<span class="rr-num">${it.i+1}</span>${esc(it.f.nombre)} (${esc(it.txt.join(', '))})`).join(' · ')}</p></div></div>`).join('');
+}
+function zonaCard(b,items){
+  const nums=items.map(({f,i})=>`<span class="rr-num">${i+1}</span>${esc(f.nombre)}`).join('<br>');
+  if(b==='sin') return `<div class="rr-z"><div class="rr-zh"><b>Sin brick asignado</b></div><p class="rr-f">${nums}</p><p class="small" style="margin:0">No hay datos de mercado de CloseUp para estos puntos de venta.</p></div>`;
+  const z=Z[b], sm=z.share_meg, sc=D.share_cartera, dif=sm-sc;
+  const brands=[]; (z.cats||[]).forEach(c=>(c.marcas||[]).forEach(m=>{ if((m.venta||0)>0) brands.push(Object.assign({cat:c},m)); }));
+  brands.sort((a,c)=>c.venta-a.venta);
+  const top=brands.slice(0,3).map(m=>`<li><b>${esc(marca(m.marca))}</b> ${nf1.format(m.share)}% en ${esc(catName(m.cat.cat).toLowerCase())} <span class="${cls(m.delta_pp)}">(${pp(m.delta_pp)})</span></li>`).join('');
+  const baja=brands.filter(m=>m.share>=3&&m.delta_pp<=-1).sort((a,c)=>a.delta_pp-c.delta_pp)[0];
+  let riesgo='';
+  if(baja){ const r=baja.cat.riser; riesgo=`<div class="rr-it">${pillA('media')}<p><b>${esc(marca(baja.marca))} pierde ${nf1.format(Math.abs(baja.delta_pp))} pp</b> en ${esc(catName(baja.cat.cat).toLowerCase())}${r?`. El que más gana es <b>${esc(r.producto)}</b> (${esc(r.corp)}, ${pp(r.delta_pp)})`:''}.</p></div>`; }
+  else { const rs=brands.map(m=>m.cat.riser).filter(Boolean).sort((a,c)=>c.delta_pp-a.delta_pp)[0];
+    if(rs) riesgo=`<div class="rr-it">${pillA('media')}<p>Competidor que más crece: <b>${esc(rs.producto)}</b> (${esc(rs.corp)}, ${pp(rs.delta_pp)}).</p></div>`; }
+  const cad=((z.cadenas&&z.cadenas.sucursales)||[]).filter(s=>!items.some(({f})=>f.id===s.id)).slice(0,3);
+  return `<div class="rr-z"><div class="rr-zh"><b>${esc(zonaCorta(b))}</b><small>Brick ${b} · ${esc(zonaDepto(b))}</small></div>
+    <p class="rr-f">${nums}</p>
+    <div class="rr-share"><span class="l">Share de Megalabs OTC en la zona</span><span class="v num">${nf1.format(sm)}%</span><span class="s num"><span class="${cls(dif)}">${pp(dif)}</span> contra el promedio de tu cartera (${nf1.format(sc)}%)</span></div>
+    ${top?`<div><span class="small">Marcas de Megalabs que más venden en la zona (share año móvil)</span><ul class="rr-ul">${top}</ul></div>`:''}
+    ${riesgo}
+    ${cad.length?`<p class="small" style="margin:0">Otras sucursales de cadenas en la zona: ${cad.map(s=>`${esc(s.nombre)} (${n0(s.unid)} unid. en agosto)`).join(' · ')}</p>`:''}
+  </div>`;
+}
+function farmCard(f,i){
+  const A=f.alertas||[], ped=f.pedido||[];
+  return `<div class="rr-card"><div class="rr-ch"><span class="rn">${i+1}</span><div class="rt"><b>${esc(f.nombre)}</b><small>${TIPO[f.tipo]} · ${Z[f.brick]?esc(zonaCorta(f.brick)):'Sin brick asignado'}</small></div><button type="button" class="rr-ver" data-ri="${i}">Ver ficha ›</button></div>
+    <p class="rr-k">${kpiLine(f)}</p>
+    ${A.length?`<div class="rr-al">${A.map(a=>`<div class="rr-a">${pillA(a.nivel)}<div><b>${esc(a.titulo)}</b><p>${esc(a.detalle)} <em>${esc(a.fuente)}</em></p></div></div>`).join('')}</div>`:'<p class="small" style="margin:0">Sin alertas para este punto de venta.</p>'}
+    ${ped.length?`<div class="rr-ped"><span class="small">Pedido sugerido</span>${ped.slice(0,3).map(q=>`<div><span class="kind ${q.tipo}">${KIND[q.tipo]||q.tipo}</span>${esc(P[q.art].n)}${q.cant!=null?` <b>x${q.cant}</b>`:''}</div>`).join('')}${ped.length>3?`<span class="small">y ${ped.length-3} más en la ficha</span>`:''}</div>`:''}
+  </div>`;
+}
+function renderRutaRes(){
+  const R=RUTA_NAV; if(!R) return;
+  R.ids=rutaGet(R.fecha); if(!R.ids.length){ renderMenu(); show('menu'); return; }
+  const fs=R.ids.map(fById), zonas=new Map();
+  R.ids.forEach((id,i)=>{ const f=fById(id), b=zonaDe(f); if(!zonas.has(b)) zonas.set(b,[]); zonas.get(b).push({f,i}); });
+  const al=fs.flatMap(f=>f.alertas||[]), altas=al.filter(a=>a.nivel==='alta').length, medias=al.filter(a=>a.nivel==='media').length;
+  const ind=fs.filter(f=>esFarmacia(f)&&!f.sin_datos&&f.kpi), c26=ind.reduce((s,f)=>s+(f.kpi.otc_ytd26||0),0), c25=ind.reduce((s,f)=>s+(f.kpi.otc_ytd25||0),0);
+  const cad=fs.filter(f=>!esFarmacia(f)&&!f.sin_datos&&f.kpi), uS=cad.reduce((s,f)=>s+(f.kpi.unid||0),0);
+  const ped=fs.flatMap(f=>f.pedido||[]), pc={}; ped.forEach(q=>pc[q.tipo]=(pc[q.tipo]||0)+1);
+  const pedTxt=Object.entries(pc).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`${n} ${(KIND[t]||t).toLowerCase()}`).join(' · ');
+  const nz=[...zonas.keys()].length;
+  let h=`<div class="rr-head"><span class="ptag">Ruta</span><h1>${esc(fechaLarga(R.fecha).replace(',',''))}</h1><p>${fs.length} punto${fs.length>1?'s':''} de venta · ${nz} zona${nz>1?'s':''}</p></div>`;
+  h+=`<div class="kpis">
+      <div class="kpi"><span class="l">Paradas</span><span class="v num">${fs.length}</span><span class="s">en ${nz} zona${nz>1?'s':''}</span></div>
+      <div class="kpi"><span class="l">Alertas altas</span><span class="v num ${altas?'down':''}">${altas}</span><span class="s">y ${medias} media${medias===1?'':'s'}</span></div>
+      ${ind.length?`<div class="kpi"><span class="l">Compras OTC 2026</span><span class="v num">${moneyC(c26)}</span><span class="s num"><span class="${cls(gr(c26,c25))}">${pct(gr(c26,c25))}</span> vs. 2025 · ${ind.length} farmacia${ind.length>1?'s':''}</span></div>`
+        :`<div class="kpi"><span class="l">Sell-out agosto</span><span class="v num">${n0(uS)}</span><span class="s">unidades en ${cad.length} sucursal${cad.length>1?'es':''}</span></div>`}
+      <div class="kpi"><span class="l">Pedido sugerido</span><span class="v num">${ped.length}</span><span class="s">producto${ped.length===1?'':'s'} en total</span></div>
+    </div>`;
+  const pan=panorama(R.ids);
+  h+=`<section class="sec"><div class="sec-h"><h2>Qué mirar en esta ruta</h2><span class="src">Resumen de todas las paradas</span></div>
+      ${pan?`<div class="rr-items">${pan}</div>`:'<p class="small" style="margin:0">Ninguna farmacia de la ruta tiene alertas.</p>'}
+      ${ped.length?`<div class="rr-it">${pillA('positiva').replace('Bien','Pedido')}<div><b>Pedido sugerido para la ruta</b><p>${esc(pedTxt)}</p></div></div>`:''}</section>`;
+  h+=`<section class="sec"><div class="sec-h"><h2>Contexto de las zonas</h2><span class="src">CloseUp · año móvil a jul-26</span></div>${[...zonas.entries()].map(([b,items])=>zonaCard(b,items)).join('')}</section>`;
+  h+=`<h2 class="mhead">Farmacia por farmacia</h2>${fs.map((f,i)=>farmCard(f,i)).join('')}`;
+  h+=`<button class="cta" id="rrGo">Ver farmacia por farmacia ›</button>`;
+  $('#rres').innerHTML=h+fuentes();
+}
+$('#rres').addEventListener('click',e=>{
+  const v=e.target.closest('[data-ri]'); if(v&&RUTA_NAV){ RUTA_NAV.idx=Number(v.dataset.ri); openFicha(RUTA_NAV.ids[RUTA_NAV.idx]); return; }
+  if(e.target.closest('#rrGo')&&RUTA_NAV){ RUTA_NAV.idx=0; openFicha(RUTA_NAV.ids[0]); }
+});
 
 
 // ---- 3 · Farmacia
@@ -894,7 +990,7 @@ function carteraLines(){
 const hoy=()=>new Date().toLocaleDateString('es-UY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 const quien=()=>SES&&SES.rol!=='vendedor' ? `Le respondés a ${SES.nombre} (${ROL[SES.rol]||SES.rol} de Megalabs), que está revisando la cartera del vendedor ${D.vendedor}. Puede preguntar desde el celular, muchas veces` : `Le respondés al vendedor ${D.vendedor}, que suele preguntar en la calle, desde el celular y muchas veces`;
 function rulesTurn(){
-  const ctx = (screen==='marca'&&cur) ? `Está mirando la marca ${marca(curBrand)} en ${cur.nombre} (id ${cur.id}).` : (screen==='farm'&&cur) ? `Está en la ficha de ${cur.nombre} (id ${cur.id}).` : 'Está en la pantalla de inicio, eligiendo qué farmacia visitar.';
+  const ctx = (screen==='marca'&&cur) ? `Está mirando la marca ${marca(curBrand)} en ${cur.nombre} (id ${cur.id}).` : (screen==='farm'&&cur) ? `Está en la ficha de ${cur.nombre} (id ${cur.id}).` : (screen==='ruta'&&RUTA_NAV) ? `Está en el resumen de su ruta del ${fechaLarga(RUTA_NAV.fecha).toLowerCase()} (${RUTA_NAV.ids.length} farmacias, en orden de visita).` : 'Está en la pantalla de inicio, eligiendo qué farmacia visitar.';
   let s=`Sos SmartBrick, el asistente de visitas a farmacias de Megalabs Uruguay. ${quien()} dictando por voz (puede haber errores de transcripción en nombres de farmacias o marcas: interpretalos con criterio).
 Reglas:
 - Español rioplatense, directo y accionable. Máximo 6 líneas o 5 viñetas cortas ("- "). Usá **negrita** solo para lo clave.
@@ -907,7 +1003,8 @@ ${rutaCtx()}Marcas OTC de Megalabs: ${Object.keys(MARCA).map(marca).join(', ')}.
 
 CARTERA (id | nombre | tipo | brick y zona | compras/ventas | alertas):
 ${carteraLines()}`;
-  if(cur && screen!=='menu') s+=`\n\nPUNTO DE VENTA EN PANTALLA:\n${JSON.stringify(farmaDetail(cur))}`;
+  if(cur && (screen==='farm'||screen==='marca')) s+=`\n\nPUNTO DE VENTA EN PANTALLA:\n${JSON.stringify(farmaDetail(cur))}`;
+  if(screen==='ruta'&&RUTA_NAV) s+=`\n\nPUNTOS DE VENTA DE LA RUTA (en orden de visita):\n${RUTA_NAV.ids.slice(0,12).map((id,i)=>(i+1)+'. '+JSON.stringify(farmaDetail(fById(id)))).join('\n')}`;
   if(cur && screen==='marca') s+=`\n\nMARCA EN PANTALLA:\n${JSON.stringify(brandSummary(cur,curBrand))}`;
   return s;
 }
@@ -974,9 +1071,10 @@ function setSendIcon(){ const has=$in.value.trim().length>0&&!ASK.sr; $send.inne
 setSendIcon();
 $in.addEventListener('input',()=>{ if(ASK.sr&&ASK.mode!=='down') ASK.userTyped=true; setSendIcon(); });
 $in.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(ASK.sr) stopRec(false); else sendAsk($in.value); } });
-function ctxLabel(){ return (screen==='marca'&&cur)? cur.nombre+' · '+marca(curBrand) : (screen==='farm'&&cur)? cur.nombre : 'Cartera de '+D.vendedor+' · '+F.length+' puntos de venta'; }
+function ctxLabel(){ if(screen==='ruta'&&RUTA_NAV) return 'Ruta del '+fechaLarga(RUTA_NAV.fecha).toLowerCase().replace(',','')+' · '+RUTA_NAV.ids.length+' farmacias'; return (screen==='marca'&&cur)? cur.nombre+' · '+marca(curBrand) : (screen==='farm'&&cur)? cur.nombre : 'Cartera de '+D.vendedor+' · '+F.length+' puntos de venta'; }
 function suggestions(){
   if(screen==='marca'&&cur){ const m=marca(curBrand); return [`¿Qué presentación de ${m} le propongo?`,`¿Cómo viene ${m} en esta zona contra la competencia?`,`¿Por qué cambiaron sus compras de ${m}?`]; }
+  if(screen==='ruta'&&RUTA_NAV) return ['¿En qué farmacia de la ruta hay más oportunidad?','¿Qué pedido llevo para cada farmacia?','Resumime la ruta en 5 puntos'];
   if(screen==='farm'&&cur) return ['¿Qué le ofrezco hoy a esta farmacia?','¿Por qué cambiaron sus compras?','Resumime la visita en 3 puntos'];
   const base=['¿Qué farmacias tengo que priorizar esta semana?','¿Cuáles dejaron de comprar OTC?','¿Qué zona tiene más oportunidad para Dolex?'];
   return (rutaCtx()?['¿Qué tengo que mirar en cada farmacia de mi ruta?']:[]).concat(base).slice(0,3);
@@ -1165,7 +1263,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.5';
+const APP_VERSION='1.6';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
