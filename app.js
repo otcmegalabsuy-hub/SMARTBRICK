@@ -764,12 +764,19 @@ const btnEscuchar = key => SYN ? `<button type="button" class="escuchar" data-tt
 .tts-t{flex:1;min-width:0}.tts-t b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tts-t small{display:block;font-size:12px;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tts-r{border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;border-radius:14px;height:32px;min-width:46px;font-size:13px;font-weight:700;flex-shrink:0}
 .tts-x{border:0;background:transparent;color:#fff;width:36px;height:36px;font-size:16px;flex-shrink:0}
-.say-on{outline:3px solid #FFC94D;outline-offset:2px;border-radius:10px}`;
+.say-on{outline:3px solid #FFC94D;outline-offset:2px;border-radius:10px}
+.msg .escuchar{color:#007C6B;border-width:1px;min-height:28px;padding:0 9px;font-size:12px;gap:4px;margin-right:8px;vertical-align:middle}
+.msg .escuchar svg{width:14px;height:14px}
+.msg .say-on{outline:none;background:#FFF0B8;border-radius:4px;box-shadow:0 0 0 3px #FFF0B8}
+.sheet-open .ttsbar{top:calc(10px + env(safe-area-inset-top,0px));bottom:auto;z-index:22}
+.autoleer{opacity:1}.autoleer[aria-pressed="false"]{opacity:.6}`;
   document.head.appendChild(st);
   $('#ttsPlay').addEventListener('click', () => { if (TTS.playing) ttsPause(); else if (TTS.done) ttsFrom(0); else ttsFrom(TTS.i); });
   $('#ttsStop').addEventListener('click', ttsStop);
   $('#ttsRate').addEventListener('click', () => { const R = [1, 1.2, 1.5, 0.85]; TTS.rate = R[(R.indexOf(TTS.rate) + 1) % R.length]; store.set('ttsRate', TTS.rate); if (TTS.playing) ttsFrom(TTS.i); else ttsUI(); });
   if (SYN.onvoiceschanged !== undefined) SYN.onvoiceschanged = () => {};
+  let unlocked = false;
+  document.addEventListener('click', ev => { if (unlocked || ev.target.closest('.askbtn,#askSend')) return; unlocked = true; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; SYN.speak(u); } catch (_) {} }, true);
 })();
 function ttsVoice() {
   const vs = SYN.getVoices() || [], norm = l => String(l || '').replace('_', '-').toLowerCase();
@@ -819,6 +826,7 @@ document.addEventListener('click', e => {
   if (TTS.key === key && TTS.segs.length) { if (TTS.playing) ttsPause(); else ttsFrom(TTS.done ? 0 : TTS.i); return; }
   if (key === 'ruta' && RUTA_NAV) ttsPlay('ruta', 'Ruta del ' + fechaLarga(RUTA_NAV.fecha).toLowerCase().replace(',', ''), guionRuta());
   else if (key.startsWith('farm') && cur) ttsPlay(key, cur.nombre, guionFarmacia(cur));
+  else if (key.startsWith('ans:')) { const ti = Number(key.slice(4)), q = ASK.turns[ti - 1]; ttsPlay(key, 'Respuesta' + (q && q.role === 'user' ? ': ' + q.content.slice(0, 60) : ' del asistente'), guionRespuesta(ti)); }
 });
 // ---- textos para leer en voz alta
 function hablar(s) {
@@ -1235,8 +1243,8 @@ function suggestions(){
   const base=['¿Qué farmacias tengo que priorizar esta semana?','¿Cuáles dejaron de comprar OTC?','¿Qué zona tiene más oportunidad para Dolex?'];
   return (rutaCtx()?['¿Qué tengo que mirar en cada farmacia de mi ruta?']:[]).concat(base).slice(0,3);
 }
-function openSheet(focus){ $sheet.hidden=false; $('#askCtx').textContent='Sobre: '+ctxLabel(); renderMsgs(); if(focus) setTimeout(()=>$in.focus(),30); }
-function closeSheet(){ if(ASK.sr) stopRec(true); $sheet.hidden=true; }
+function openSheet(focus){ $sheet.hidden=false; document.body.classList.add('sheet-open'); $('#askCtx').textContent='Sobre: '+ctxLabel(); renderMsgs(); if(focus) setTimeout(()=>$in.focus(),30); }
+function closeSheet(){ if(ASK.sr) stopRec(true); $sheet.hidden=true; document.body.classList.remove('sheet-open'); }
 $('#askClose').addEventListener('click',closeSheet);
 function md(t){
   const lines=esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').split(/\n/);
@@ -1256,13 +1264,25 @@ function renderMsgs(){
     $msgs.innerHTML=saludo()+`<div class="sugs">${suggestions().map(s=>`<button class="sug" data-q="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
     return;
   }
-  $msgs.innerHTML=ASK.turns.map(t=>{
+  $msgs.innerHTML=ASK.turns.map((t,ti)=>{
     if(t.role==='user') return `<div class="msg u">${esc(t.content)}<span class="meta">${t.time||''}${t.voz?' · por voz':''}</span></div>`;
     const body = t.pending ? '<span class="dots" aria-label="Pensando"><span></span><span></span><span></span></span> <span class="small">Buscando en los datos…</span>' : md(t.text||'');
-    return `<div class="msg a">${body}${t.err?`<p class="err">${esc(t.err)}</p>${t.retry?'<button class="retry" data-retry="1">Reintentar</button>':''}`:''}${!t.pending?`<span class="meta">${t.time||''}</span>`:''}</div>`;
+    return `<div class="msg a" data-turn="${ti}">${body}${t.err?`<p class="err">${esc(t.err)}</p>${t.retry?'<button class="retry" data-retry="1">Reintentar</button>':''}`:''}${!t.pending?`<span class="meta">${t.text&&!t.failed?btnEscuchar('ans:'+ti):''}${t.time||''}</span>`:''}</div>`;
   }).join('') + (ASK.busy?'<button class="stop" id="askStop">Detener</button>':'') + (!ASK.busy?`<div class="sugs">${suggestions().slice(0,2).map(s=>`<button class="sug" data-q="${esc(s)}">${esc(s)}</button>`).join('')}</div>`:'');
+  $msgs.querySelectorAll('.msg.a[data-turn]').forEach(m=>m.querySelectorAll(':scope > p:not(.err):not(.small), :scope > ul > li').forEach((el,j)=>el.dataset.blk=j));
+  if(TTS.key&&TTS.key.startsWith('ans:')) ttsMark();
   $msgs.scrollTop=$msgs.scrollHeight;
 }
+// guion para leer una respuesta: un tramo por párrafo o viñeta, para ir marcando lo que se lee
+function guionRespuesta(ti){
+  return [...$msgs.querySelectorAll(`.msg.a[data-turn="${ti}"] [data-blk]`)].map(el=>({t:hablar(el.textContent), sel:`#askMsgs .msg.a[data-turn="${ti}"] [data-blk="${el.dataset.blk}"]`})).filter(x=>x.t);
+}
+const TTS_AUTO={ get(){ return store.get('ttsAuto',true)!==false; }, set(v){ store.set('ttsAuto',!!v); } };
+(function(){ if(!SYN) return;
+  $('#askClose').insertAdjacentHTML('beforebegin','<button class="x autoleer" id="askAuto" type="button"></button>');
+  const pinta=()=>{ const on=TTS_AUTO.get(), b=$('#askAuto'); b.setAttribute('aria-pressed',on); b.setAttribute('aria-label',on?'Lectura en voz alta activada':'Lectura en voz alta desactivada'); b.title=on?'Las respuestas a preguntas por voz se leen en voz alta':'No se leen en voz alta'; b.innerHTML=on?ICO_SPK:ICO_SPK.replace('</svg>','<path d="M3 3l18 18"></path></svg>'); };
+  pinta(); $('#askAuto').addEventListener('click',()=>{ TTS_AUTO.set(!TTS_AUTO.get()); pinta(); if(!TTS_AUTO.get()&&TTS.key.startsWith('ans:')) ttsPause(); });
+})();
 $msgs.addEventListener('click',e=>{
   const s=e.target.closest('[data-q]'); if(s){ sendAsk(s.dataset.q); return; }
   if(e.target.closest('#askStop')){ ASK.ctl&&ASK.ctl.abort(); return; }
@@ -1300,6 +1320,7 @@ async function sendAsk(text, voz){
     else { a.err= timeout?'El asistente tardó demasiado en responder. Probá de nuevo.' : !navigator.onLine?'No hay conexión a internet. Probá de nuevo cuando tengas señal.' : 'No pude conectar con el asistente. Si sigue pasando, avisale al administrador de SmartBrick.'; a.retry=true; a.failed=true; }
   }finally{ clearTimeout(tmr); }
   fin();
+  if(voz&&a.text&&!a.failed&&SYN&&TTS_AUTO.get()){ const ti=ASK.turns.indexOf(a); ttsPlay('ans:'+ti, 'Respuesta: '+text.slice(0,60), guionRespuesta(ti)); }
 }
 
 // ---- Voz con el reconocimiento del navegador (Chrome, Edge, Safari)
@@ -1420,7 +1441,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.7';
+const APP_VERSION='1.8';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
