@@ -646,6 +646,9 @@ function rutaCtx(){
 // ---- Resumen de la ruta: pantalla intermedia antes de ver farmacia por farmacia
 const NIVEL={alta:'Alta',media:'Media',positiva:'Bien'};
 const pillA=n=>`<span class="apill ${n}">${NIVEL[n]||n}</span>`;
+const pillG=(n,txt)=>`<span class="gpill ${n}">${txt||NIVEL[n]||n}</span>`;
+// "Qué mirar" siempre en verde con letras blancas (estilos agregados desde aquí para no cambiar index.html)
+(function(){ const st=document.createElement('style'); st.textContent=`.qm{gap:10px}.qm .green-h h2{font-size:20px}.qm-sub{margin:-6px 0 2px;font-size:12.5px;color:#DDEFE6}.qm .rr-it{background:var(--green-item);border:1px solid var(--green-line);border-radius:9px;padding:10px 12px;color:#fff}.qm .rr-it b{color:#fff;font-size:15px}.qm .rr-it p{color:#E4F1EA}.qm .rr-num{background:#fff;color:#174F3A}.qm .rr-it .gpill{grid-row:auto}.qm .gempty{margin:0;color:#E4F1EA}.qm-mini{padding:10px 10px 12px;gap:8px;border-radius:10px}.qm-mini h3{font-size:15.5px;font-weight:700;color:#fff;margin:2px 2px 0}.qm-mini .gitem{padding:8px 10px}.qm-mini .gitem b{font-size:14.5px}.qm-mini .gitem p{font-size:12.5px}`; document.head.appendChild(st); })();
 const zonaDe=f=>Z[f.brick]?String(f.brick):'sin';
 function kpiLine(f){
   if(f.sin_datos) return 'Sin compras registradas en Venta Real desde enero de 2025.';
@@ -678,7 +681,7 @@ function panoramaGrupos(ids){
     .map(G=>Object.assign(G,{lista:Object.values(G.items).sort((a,b)=>a.i-b.i)}));
 }
 function panorama(ids){
-  return panoramaGrupos(ids).map((G,gi)=>`<div class="rr-it" data-say="g${gi}">${pillA(G.nivel)}<div><b>${esc(G.label)}</b><p>${G.lista.map(it=>`<span class="rr-num">${it.i+1}</span>${esc(it.f.nombre)} (${esc(it.txt.join(', '))})`).join(' · ')}</p></div></div>`).join('');
+  return panoramaGrupos(ids).map((G,gi)=>`<div class="rr-it" data-say="g${gi}">${pillG(G.nivel)}<div><b>${esc(G.label)}</b><p>${G.lista.map(it=>`<span class="rr-num">${it.i+1}</span>${esc(it.f.nombre)} (${esc(it.txt.join(', '))})`).join(' · ')}</p></div></div>`).join('');
 }
 function zonaCard(b,items,zi){
   const nums=items.map(({f,i})=>`<span class="rr-num">${i+1}</span>${esc(f.nombre)}`).join('<br>');
@@ -705,7 +708,7 @@ function farmCard(f,i){
   const A=f.alertas||[], ped=f.pedido||[];
   return `<div class="rr-card" data-say="f${i}"><div class="rr-ch"><span class="rn">${i+1}</span><div class="rt"><b>${esc(f.nombre)}</b><small>${TIPO[f.tipo]} · ${Z[f.brick]?esc(zonaCorta(f.brick)):'Sin brick asignado'}</small></div><button type="button" class="rr-ver" data-ri="${i}">Ver ficha ›</button></div>
     <p class="rr-k">${kpiLine(f)}</p>
-    ${A.length?`<div class="rr-al">${A.map(a=>`<div class="rr-a">${pillA(a.nivel)}<div><b>${esc(a.titulo)}</b><p>${esc(a.detalle)} <em>${esc(a.fuente)}</em></p></div></div>`).join('')}</div>`:'<p class="small" style="margin:0">Sin alertas para este punto de venta.</p>'}
+    <div class="green qm qm-mini"><h3>Qué mirar antes de entrar</h3>${A.length?A.map(a=>`<div class="gitem">${pillG(a.nivel)}<b>${esc(a.titulo)}</b><p>${esc(a.detalle)} <em>${esc(a.fuente)}</em></p></div>`).join(''):'<p class="gempty">No hay alertas para este punto de venta.</p>'}</div>
     ${ped.length?`<div class="rr-ped"><span class="small">Pedido sugerido</span>${ped.slice(0,3).map(q=>`<div><span class="kind ${q.tipo}">${KIND[q.tipo]||q.tipo}</span>${esc(P[q.art].n)}${q.cant!=null?` <b>x${q.cant}</b>`:''}</div>`).join('')}${ped.length>3?`<span class="small">y ${ped.length-3} más en la ficha</span>`:''}</div>`:''}
   </div>`;
 }
@@ -729,9 +732,9 @@ function renderRutaRes(){
       <div class="kpi"><span class="l">Pedido sugerido</span><span class="v num">${ped.length}</span><span class="s">producto${ped.length===1?'':'s'} en total</span></div>
     </div>`;
   const pan=panorama(R.ids);
-  h+=`<section class="sec"><div class="sec-h"><h2>Qué mirar en esta ruta</h2>${btnEscuchar('ruta')}</div><span class="src" style="margin-top:-6px">Resumen de todas las paradas</span>
-      ${pan?`<div class="rr-items">${pan}</div>`:'<p class="small" style="margin:0">Ninguna farmacia de la ruta tiene alertas.</p>'}
-      ${ped.length?`<div class="rr-it">${pillA('positiva').replace('Bien','Pedido')}<div><b>Pedido sugerido para la ruta</b><p>${esc(pedTxt)}</p></div></div>`:''}</section>`;
+  h+=`<section class="green qm"><div class="green-h"><h2>Qué mirar en esta ruta</h2>${btnEscuchar('ruta')}</div><p class="qm-sub">Resumen de todas las paradas</p>
+      ${pan?`<div class="rr-items">${pan}</div>`:'<p class="gempty">Ninguna farmacia de la ruta tiene alertas.</p>'}
+      ${ped.length?`<div class="rr-it">${pillG('positiva','Pedido')}<div><b>Pedido sugerido para la ruta</b><p>${esc(pedTxt)}</p></div></div>`:''}</section>`;
   h+=`<section class="sec"><div class="sec-h"><h2>Contexto de las zonas</h2><span class="src">CloseUp · año móvil a jul-26</span></div>${[...zonas.entries()].map(([b,items],zi)=>zonaCard(b,items,zi)).join('')}</section>`;
   h+=`<h2 class="mhead">Farmacia por farmacia</h2>${fs.map((f,i)=>farmCard(f,i)).join('')}`;
   h+=`<button class="cta" id="rrGo">Ver farmacia por farmacia ›</button>`;
@@ -1441,7 +1444,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.8';
+const APP_VERSION='1.9';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
