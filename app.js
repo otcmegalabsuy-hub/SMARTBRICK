@@ -282,7 +282,7 @@ function marcaView(f){
     const mxc=Math.max(...x.cart.map(c=>c.s),1);
     h+=`<section class="sec"><div class="sec-h"><h2>Share de ${esc(mb)} en tu cartera</h2><span class="src">${esc(catName(x.cat))} · 20 bricks</span></div>
       <span class="small" style="margin-top:-6px">Promedio de la cartera: <b style="color:var(--ink)">${nf1.format(x.cartAvg)}%</b>. Este brick está ${x.cartPos}º de ${x.cart.length}.</span>
-      ${hrows(x.cart.map(c=>({label:esc(zonaCorta(c.k))+(c.k===String(f.brick)?' <span class="g" style="color:var(--brand-strong)">ESTA ZONA</span>':''), w:c.s/mxc*100, cls:c.k===String(f.brick)?'b-sel':'b-oth', val:nf1.format(c.s)+'%', title:'Brick '+c.k})))}
+      ${hrows(x.cart.map(c=>({label:esc(zonaCorta(c.k))+(c.k===String(f.brick)?' <span class="g" style="color:var(--tq-text)">ESTA ZONA</span>':''), w:c.s/mxc*100, cls:c.k===String(f.brick)?'b-sel':'b-oth', val:nf1.format(c.s)+'%', title:'Brick '+c.k})))}
     </section>`;
   }
   // D. cadenas del brick
@@ -1077,7 +1077,7 @@ function marcaScreen(f){
     const mxc=Math.max(...x.cart.map(c=>c.s),1);
     h+=`<section class="sec"><div class="sec-h"><h2>Share de ${esc(mb)} en tu cartera</h2><span class="src">${esc(catName(x.cat))} · ${x.cart.length} bricks</span></div>
       <span class="small">Promedio de la cartera: <b style="color:var(--ink)">${nf1.format(x.cartAvg)}%</b>. Este brick está ${x.cartPos}º de ${x.cart.length}.</span>
-      ${hrows(x.cart.map(c=>({label:esc(zonaCorta(c.k))+(c.k===String(f.brick)?' <span class="g" style="color:var(--brand-strong)">ESTA ZONA</span>':''),w:c.s/mxc*100,cls:c.k===String(f.brick)?'b-sel':'b-oth',val:nf1.format(c.s)+'%',title:'Brick '+c.k})))}</section>`;
+      ${hrows(x.cart.map(c=>({label:esc(zonaCorta(c.k))+(c.k===String(f.brick)?' <span class="g" style="color:var(--tq-text)">ESTA ZONA</span>':''),w:c.s/mxc*100,cls:c.k===String(f.brick)?'b-sel':'b-oth',val:nf1.format(c.s)+'%',title:'Brick '+c.k})))}</section>`;
   }
   if(Z[f.brick]){
     const agg={}; x.chains.forEach(c=>c.productos.forEach(p=>{ if(P[p.art].m!==b) return; const a=agg[p.art]||(agg[p.art]={u:0,st:0,hasSt:false}); a.u+=p.u||0; if(p.stock!=null){a.st+=p.stock;a.hasSt=true;} }));
@@ -1342,7 +1342,7 @@ const askBtns=()=>document.querySelectorAll('.askbtn');
   const p=$('#recPill'); p.removeAttribute('role'); $('#recTxt').setAttribute('aria-live','polite');
   p.insertAdjacentHTML('beforeend','<button type="button" class="rb cancel" id="recCancel">Cancelar</button><button type="button" class="rb send" id="recSend">Enviar</button>');
   const st=document.createElement('style');
-  st.textContent='.recpill{padding:8px 8px 8px 16px}.recpill span{flex:1;min-width:0}.recpill .rb{border:0;border-radius:18px;min-height:38px;padding:0 14px;font-size:14px;font-weight:700;flex-shrink:0;font-family:inherit}.recpill .rb.cancel{background:#EEF1F3;color:#151A18}.recpill .rb.send{background:#0A7B73;color:#fff}';
+  st.textContent='.recpill{padding:8px 8px 8px 16px}.recpill span{flex:1;min-width:0}.recpill .rb{border:0;border-radius:18px;min-height:38px;padding:0 14px;font-size:14px;font-weight:700;flex-shrink:0;font-family:inherit}.recpill .rb.cancel{background:#EEF1F3;color:#151A18}.recpill .rb.send{background:#37B4AE;color:#fff}';
   document.head.appendChild(st);
   $('#recCancel').addEventListener('click',()=>stopRec(true));
   $('#recSend').addEventListener('click',()=>stopRec(false));
@@ -1444,7 +1444,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.12';
+const APP_VERSION='1.13';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
@@ -1471,7 +1471,7 @@ arranque();
   var g = c.getContext('2d'); if (!g) return;
   var W = 0, H = 0, N = [], last = 0, T = 0, seed = 11, TAU = Math.PI * 2;
   var RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var A = [10, 123, 115], B = [55, 180, 174];            // turquesa profundo -> turquesa claro
+  var A = [43, 164, 158], B = [110, 205, 198];           // turquesa -> turquesa claro
   var rand = function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   var rnd = function (a, b) { return a + rand() * (b - a); };
   var mix = function (t) { return Math.round(A[0] + (B[0] - A[0]) * t) + ',' + Math.round(A[1] + (B[1] - A[1]) * t) + ',' + Math.round(A[2] + (B[2] - A[2]) * t); };
