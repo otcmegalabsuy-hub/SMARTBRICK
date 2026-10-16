@@ -915,8 +915,7 @@ function renderFarm(){
     <p>${f.brick?'Brick '+f.brick+' · '+esc(zonaCorta(f.brick)):'Sin brick asignado'}</p>
     <p>${f.zona_erp?'Zona ERP: '+esc(f.zona_erp)+' · ':''}${esc(f.depto||zonaDepto(f.brick))}${f.ruta?' · '+esc(f.ruta):''}</p>`;
   const esF=esFarmacia(f);
-  const tabs=[['resumen','Resumen'],[esF?'compras':'ventas',esF?'Compras':'Ventas'],['marca','Marca'],['zona','Zona'],['pedido','Pedido']];
-  $('#tabs').innerHTML=tabs.map(([k,l])=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${k===curTab}">${l}</button>`).join('');
+  $('#tabs').innerHTML=tabsHTML(f);
   renderFarmTab(); renderRutaBar();
 }
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('.tab'); if(!b) return; if(b.dataset.k==='marca'){ openMarcas(); return; } curTab=b.dataset.k; document.querySelectorAll('#tabs .tab').forEach(t=>t.setAttribute('aria-selected',t===b)); renderFarmTab(); });
@@ -926,7 +925,10 @@ function renderFarmTab(){
   else if(curTab==='compras') p.innerHTML=compras(f);
   else if(curTab==='ventas') p.innerHTML=ventas(f);
   else if(curTab==='zona') p.innerHTML=zona(f);
-  else p.innerHTML=pedido(f);
+  else if(curTab==='stock') p.innerHTML=stockMega(f);
+  else if(curTab==='rotacion') p.innerHTML=bajaRotacion(f);
+  else if(curTab==='desvio') p.innerHTML=desvioBrick(f);
+  else p.innerHTML=pedidos(f);
   p.insertAdjacentHTML('beforeend', fuentes());
   p.querySelectorAll('[data-chart]').forEach(bindChart);
   const cp=p.querySelector('#copiar'); if(cp) cp.addEventListener('click',copiarPedido);
@@ -1091,6 +1093,221 @@ function marcaScreen(f){
 }
 
 
+
+// ---- v1.14 · Ficha en dos grupos: Información (lo que pasó) y Acciones (qué hacer)
+(function(){ const st=document.createElement('style'); st.textContent=`
+#tabs.tabs{display:flex;flex-direction:column;gap:8px;background:none;border:0;padding:0}
+.tgrp{display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr));gap:5px;background:var(--surface);border:1.5px solid var(--edge);border-radius:10px;padding:5px;align-items:stretch}
+.tlab{display:grid;place-items:center;padding:0 9px;border-radius:7px;background:var(--brand);color:#fff;font-size:13px;font-weight:700;letter-spacing:.01em}
+.tgrp .tab{min-height:44px;border-radius:7px;background:#E7EBEC;font-size:12.5px;font-weight:500;line-height:1.15;padding:2px 3px;color:var(--ink)}
+.tgrp .tab[aria-selected="true"]{background:var(--brand-soft);box-shadow:inset 0 0 0 2px var(--brand);color:var(--tq-text);font-weight:700}
+.opt3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.opt3 button{min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--surface);font-size:13px;line-height:1.2;padding:4px 6px;color:var(--ink)}
+.opt3 button b{display:block;font-size:15px}
+.opt3 button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);color:var(--tq-text)}
+.ptot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:10px 12px}
+.ptot b{font-size:20px}
+.ptab{width:100%;border-collapse:collapse;font-size:13.5px}
+.ptab th{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:right;padding:6px 4px;border-bottom:1px solid var(--line)}
+.ptab th:first-child,.ptab td:first-child{text-align:left}
+.ptab td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+.ptab td.psug{font-weight:700;font-size:15px;color:var(--tq-text)}
+.ptab td small{display:block;color:var(--muted);font-size:11.5px}
+.acc{display:flex;flex-direction:column;gap:10px}
+.acc-i{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}
+.acc-i .t{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.acc-i .t b{font-size:14.5px}
+.acc-i .t .num{font-weight:700;color:var(--tq-text);white-space:nowrap}
+.acc-i p{margin:0;font-size:13px;color:#2B302E;line-height:1.45}
+.meter{position:relative;height:8px;border-radius:4px;background:#E7EBEC;overflow:hidden}
+.meter i{position:absolute;inset:0 auto 0 0;background:var(--brand);border-radius:4px}
+.chip-s{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border-radius:5px;padding:2px 6px;background:#ECEFEF;color:var(--muted)}
+.chip-s.inc{background:#FAF0D6;color:#7A5300}
+.soon{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:18px 10px;border:1.5px dashed var(--line);border-radius:12px;background:var(--surface)}
+.soon svg{color:var(--tq-text)}
+.soon b{font-size:17px}
+`; document.head.appendChild(st); })();
+
+const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const TABS_INFO=f=>[['resumen','Resumen'],[esFarmacia(f)?'compras':'ventas',esFarmacia(f)?'Compras':'Ventas'],['marca','Marcas'],['zona','Zona']];
+const TABS_ACC=[['pedidos','Pedidos'],['stock','Stock<br>Mega'],['rotacion','Baja<br>Rotación'],['desvio','Desvío<br>vs Brick']];
+function tabsHTML(f){
+  const b=([k,l])=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${k===curTab}">${l}</button>`;
+  return `<div class="tgrp" role="tablist" aria-label="Información"><span class="tlab">Información</span>${TABS_INFO(f).map(b).join('')}</div>
+    <div class="tgrp" role="tablist" aria-label="Acciones"><span class="tlab">Acciones</span>${TABS_ACC.map(b).join('')}</div>`;
+}
+// Fecha de la visita: la de la ruta si la ficha se abrió desde una ruta; si no, hoy.
+function fechaVisita(f){
+  const iso = (typeof RUTA_NAV!=='undefined' && RUTA_NAV && RUTA_NAV.ids && RUTA_NAV.ids.includes(f.id)) ? RUTA_NAV.fecha : (()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  const [y,m]=iso.split('-').map(Number); return {iso, y, m};
+}
+const ym=(y,m)=>y+'-'+String(m).padStart(2,'0');
+const uDe=(f,a)=>{ const p=(f.productos||[]).find(x=>x.art==a); return p? (p.u12!=null?p.u12:(p.u||0)) : 0; };
+
+// ---------- Pedidos ----------
+const PED_OPTS=[{k:0,f:1,l:'Igual'},{k:2,f:1.02,l:'+2%'},{k:4,f:1.04,l:'+4%'}];
+let pedOpt = store.get('pedopt',0);
+let PED_ROWS=[];
+function calcPedido(f, factor){
+  const v=fechaVisita(f), base=ym(v.y-1,v.m), act=ym(v.y,v.m), iB=MI.indexOf(base), iA=MI.indexOf(act);
+  const rows=[];
+  Object.entries(f.skum||{}).forEach(([a,arr])=>{
+    const bu=(arr.find(r=>r[0]===iB)||[0,0])[1]||0; if(bu<=0) return;
+    const ya=iA>=0 ? Math.max(0,(arr.find(r=>r[0]===iA)||[0,0])[1]||0) : 0;
+    const lp=[...arr].filter(r=>r[1]>0&&r[3]>0).sort((x,y)=>y[0]-x[0])[0];
+    rows.push({art:a, base:bu, ya, precio: lp? lp[3]/lp[1] : null});
+  });
+  // reparto por mayor resto: el total queda exactamente en +0 / +2 / +4 %
+  const ideal=rows.map(r=>r.base*factor), fl=ideal.map(Math.floor);
+  let rest=Math.round(ideal.reduce((s,x)=>s+x,0))-fl.reduce((s,x)=>s+x,0);
+  ideal.map((x,i)=>[x-fl[i],i]).sort((p,q)=>q[0]-p[0]).forEach(([,i])=>{ if(rest>0){ fl[i]++; rest--; } });
+  rows.forEach((r,i)=>{ r.meta=fl[i]; r.sug=Math.max(0,r.meta-r.ya); });
+  rows.sort((p,q)=>q.sug-p.sug||q.base-p.base);
+  return {v, base, act, iB, iA, rows};
+}
+function pedidos(f){
+  if(f.sin_datos) return `<div class="empty">Sin compras registradas en Venta Real para armar un pedido.</div>`;
+  if(!esFarmacia(f)) return pedidoCadena(f);
+  const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
+  const C=calcPedido(f,o.f), mB=MESL[C.v.m-1], yB=C.v.y-1;
+  PED_ROWS=C.rows;
+  const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.l}</b>${x.k===0?'que '+mB.slice(0,3)+'-'+String(yB).slice(2):'en unidades'}</button>`).join('');
+  const inc=(f.pedido||[]).filter(q=>q.tipo==='incorporar').length;
+  const head=`<section class="sec"><div class="sec-h"><h2>Pedido sugerido</h2><span class="src">Venta Real · unidades</span></div>
+    <span class="small" style="margin-top:-4px">Visita de ${mB} ${C.v.y}: se toma lo que compró en ${mB} ${yB}.</span>
+    <div class="opt3" role="group" aria-label="Tipo de pedido">${btns}</div>`;
+  if(C.iB<0) return head+`<div class="empty">No hay datos de ${mB} ${yB} para comparar.</div></section>`;
+  if(!C.rows.length) return head+`<div class="empty">En ${mB} de ${yB} no compró productos OTC de Megalabs, así que no hay un pedido base para repetir.${inc?' Mirá <button class="btn sec2" data-goto="desvio">Desvío vs Brick</button> para productos a incorporar.':''}</div></section>`;
+  const tB=C.rows.reduce((s,r)=>s+r.base,0), tM=C.rows.reduce((s,r)=>s+r.meta,0), tY=C.rows.reduce((s,r)=>s+r.ya,0), tS=C.rows.reduce((s,r)=>s+r.sug,0);
+  const val=C.rows.reduce((s,r)=>s+(r.precio?r.precio*r.sug:0),0);
+  const colYa=C.iA>=0;
+  return head+`
+    <div class="ptot"><span>Pedido: <b class="num">${n0(tS)}</b> unid. en ${C.rows.filter(r=>r.sug>0).length} productos</span><span class="small num">${mB.slice(0,3)}-${String(yB).slice(2)}: ${n0(tB)} unid. → meta ${n0(tM)}${colYa?' · ya compró '+n0(tY):''}${val?' · ≈ '+moneyC(val):''}</span></div>
+    <table class="ptab"><thead><tr><th>Producto</th><th>${mB.slice(0,3)}-${String(yB).slice(2)}</th>${colYa?`<th>Ya ${mB.slice(0,3)}-${String(C.v.y).slice(2)}</th>`:''}<th>Pedir</th></tr></thead><tbody>
+    ${C.rows.map(r=>`<tr><td>${esc((P[r.art]||{n:r.art}).n)}${r.sug===0?'<small>Ya cubierto este mes</small>':''}</td><td class="num">${n0(r.base)}</td>${colYa?`<td class="num">${n0(r.ya)}</td>`:''}<td class="num psug">${n0(r.sug)}</td></tr>`).join('')}
+    </tbody></table>
+    <span class="small">${colYa?`Se descuenta lo que ya compró en ${mB} ${C.v.y} (Venta Real al ${D.corte.venta_real}).`:`Venta Real llega hasta el ${D.corte.venta_real}: todavía no hay compras de ${mB} ${C.v.y} para descontar.`} Unidades de facturación; el valor es aproximado, con el precio neto de la última compra.</span>
+    ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Desvío vs Brick</button>.</span>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">Copiar pedido</button><span class="small" id="copiado" aria-live="polite" style="align-self:center"></span></div>
+    <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>
+  </section>`;
+}
+function pedidoCadena(f){
+  const ps=(f.productos||[]).filter(p=>p.u>0||(p.stock!=null&&p.stock>0));
+  const conStock=f.tipo==='FARMASHOP';
+  const bajos=conStock? ps.filter(p=>p.u>0&&p.stock!=null&&(p.cob==null||p.cob<2)).map(p=>({...p, rep:Math.max(0,Math.ceil(p.u/4.33*4-(p.stock||0)))})).sort((a,b)=>b.rep-a.rep) : [];
+  const top=[...ps].sort((a,b)=>b.u-a.u).slice(0,8);
+  return `<section class="sec"><div class="sec-h"><h2>Pedido</h2><span class="src">Sell-Out ${D.corte.cadenas}</span></div>
+    <div class="empty" style="text-align:left">Las sucursales de ${esc(TIPO[f.tipo])} compran por la central de la cadena: no hay compras por sucursal para comparar con el año anterior.</div>
+    ${conStock?`<h3 style="margin:4px 0 0;font-size:15px">Para reponer en la sucursal</h3>
+      ${bajos.length?`<table class="ptab"><thead><tr><th>Producto</th><th>Vendió</th><th>Stock</th><th>Reponer</th></tr></thead><tbody>${bajos.map(p=>`<tr><td>${esc(P[p.art].n)}<small>${p.cob==null?'sin stock':'cubre '+nf1.format(p.cob)+' semanas'}</small></td><td class="num">${n0(p.u)}</td><td class="num">${n0(p.stock)}</td><td class="num psug">${n0(p.rep)}</td></tr>`).join('')}</tbody></table>
+      <span class="small">Productos con menos de 2 semanas de stock según lo que vendió en agosto; la reposición lleva la cobertura a 4 semanas.</span>`:'<div class="empty">Ningún producto tiene menos de 2 semanas de stock.</div>'}`
+    :`<h3 style="margin:4px 0 0;font-size:15px">Lo que más vendió en agosto</h3><table class="ptab"><thead><tr><th>Producto</th><th>Unid.</th></tr></thead><tbody>${top.map(p=>`<tr><td>${esc(P[p.art].n)}</td><td class="num">${n0(p.u)}</td></tr>`).join('')}</tbody></table>
+      <span class="small">${esc(TIPO[f.tipo])} no informa stock por sucursal.</span>`}
+  </section>`;
+}
+function copiarPedido2(){
+  const f=cur, o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0], v=fechaVisita(f);
+  const L=PED_ROWS.filter(r=>r.sug>0);
+  const txt=f.nombre+' — pedido '+(o.k?o.l+' vs. ':'igual a ')+MESL[v.m-1]+' '+(v.y-1)+'\n'+L.map(r=>'• '+P[r.art].n+' — '+r.sug+' unid.').join('\n')+'\nTotal: '+L.reduce((s,r)=>s+r.sug,0)+' unid.';
+  const ok=()=>{ $('#copiado').textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
+  const fallback=()=>{ const t=$('#pedtxt'); t.hidden=false; t.value=txt; t.focus(); t.select(); $('#copiado').textContent='Seleccioná el texto y copialo.'; };
+  try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
+}
+
+// ---------- Stock Mega (preparado, sin fuente de datos todavía) ----------
+function stockMega(f){
+  const C=esFarmacia(f)&&!f.sin_datos ? calcPedido(f,1) : {rows:[]};
+  const L=C.rows.slice(0,8);
+  return `<section class="sec"><div class="sec-h"><h2>Stock en el centro logístico</h2><span class="src">Megalabs</span></div>
+    <div class="soon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M8 20v-7h8v7"/><path d="M8 16h8"/></svg>
+      <b>Próximamente</b><span class="small">Cuando se conecte el stock del centro logístico, acá vas a ver si cada producto tiene stock o está en quiebre antes de ofrecerlo, empezando por los del pedido.</span></div>
+    ${L.length?`<table class="ptab"><thead><tr><th>Producto del pedido</th><th>Stock Mega</th></tr></thead><tbody>${L.map(r=>`<tr><td>${esc(P[r.art].n)}</td><td><span class="chip-s">Sin dato</span></td></tr>`).join('')}</tbody></table>`:''}
+  </section>`;
+}
+
+// ---------- Baja rotación ----------
+// Factor de tamaño robusto: mediana de (unidades acá / unidades de referencia) entre los productos que tienen ambos.
+// Así un producto gigante (p. ej. Dolex x 8 en una farmacia mayorista) no distorsiona la comparación del resto.
+function factorTam(pares, respaldo){
+  const r=pares.filter(([u,ref])=>u>0&&ref>0).map(([u,ref])=>u/ref).sort((x,y)=>x-y);
+  if(r.length<5) return respaldo;
+  const m=r.length>>1; return r.length%2?r[m]:(r[m-1]+r[m])/2;
+}
+function bajaRotacion(f){
+  if(f.sin_datos) return `<div class="empty">Sin datos de ventas para comparar.</div>`;
+  const items=[];
+  if(esFarmacia(f)){
+    const tot=g=>(g.productos||[]).reduce((s,p)=>s+(p.u12||0),0);
+    const T=tot(f); if(T<=0) return `<div class="empty">No compró productos OTC de Megalabs en los últimos 12 meses.</div>`;
+    const peers=F.filter(g=>g.id!==f.id&&esFarmacia(g)&&!g.sin_datos&&tot(g)>0);
+    const media=G=>{ const S={}; G.forEach(g=>g.productos.forEach(p=>{ S[p.art]=(S[p.art]||0)+(p.u12||0); })); Object.keys(S).forEach(a=>S[a]/=G.length||1); return S; };
+    const Mc=media(peers), zp=peers.filter(g=>g.brick&&g.brick===f.brick), Mz=zp.length>=2?media(zp):null;
+    const own=a=>uDe(f,a);
+    const sc=factorTam(Object.keys(Mc).map(a=>[own(a),Mc[a]]), T/(peers.reduce((s,g)=>s+tot(g),0)/(peers.length||1)));
+    const sz=Mz?factorTam(Object.keys(Mz).map(a=>[own(a),Mz[a]]), sc):null;
+    Object.keys(Mc).forEach(a=>{
+      if(!P[a]) return;
+      const exp=Mc[a]*sc, act=own(a); if(exp<6) return;
+      const idx=act/exp; if(idx>=0.5) return;
+      items.push({a, act, exp, idx, ez:Mz&&Mz[a]?Mz[a]*sz:null, per:'en 12 meses'});
+    });
+    items.sort((x,y)=>(y.exp-y.act)-(x.exp-x.act));
+    return rotHTML(items.slice(0,10), `Comparado con los otros ${peers.length} clientes independientes de tu cartera${Mz?` (y con los ${zp.length} de su mismo brick)`:''}, ajustado a lo que suele comprar esta farmacia. Venta Real, últimos 12 meses.`);
+  }
+  const k=f.kpi||{};
+  const sc=factorTam((f.productos||[]).map(p=>[p.u||0,p.u_cadena||0]), (k.indice||100)/100);
+  (f.productos||[]).forEach(p=>{
+    if(!P[p.art]||!p.u_cadena) return;
+    const exp=p.u_cadena*sc; if(exp<3) return;
+    const idx=(p.u||0)/exp; if(idx>=0.5) return;
+    items.push({a:p.art, act:p.u||0, exp, idx, nolist:!p.listado, per:'en agosto'});
+  });
+  items.sort((x,y)=>(y.exp-y.act)-(x.exp-x.act));
+  return rotHTML(items.slice(0,10), `Comparado con las ${k.n_suc||''} sucursales de ${esc(TIPO[f.tipo])}, ajustado a lo que suele vender esta sucursal. Sell-Out ${D.corte.cadenas}.`);
+}
+function rotHTML(L, nota){
+  return `<section class="sec"><div class="sec-h"><h2>Productos que rotan menos</h2><span class="src">${L.length} producto${L.length===1?'':'s'}</span></div>
+    <span class="small" style="margin-top:-4px">${nota}</span>
+    ${L.length?`<div class="acc">${L.map(x=>`<div class="acc-i"><div class="t"><b>${esc(P[x.a].n)}</b><span class="num">${Math.round(x.idx*100)}% del ritmo</span></div>
+      <div class="meter" aria-hidden="true"><i style="width:${Math.min(100,Math.round(x.idx*100))}%"></i></div>
+      <p>Acá: <b>${n0(x.act)}</b> unid. ${x.per}. Al ritmo de clientes similares serían <b>${n0(x.exp)}</b>${x.ez!=null?`; al de su zona, ${n0(x.ez)}`:''}.${x.nolist?' <span class="chip-s inc">No listado</span>':(x.act===0?' <span class="chip-s inc">No lo compra</span>':'')}</p></div>`).join('')}</div>`
+      :'<div class="empty">Ningún producto rota por debajo de la mitad del ritmo de clientes similares.</div>'}
+  </section>`;
+}
+
+// ---------- Desvío vs Brick ----------
+function desvioBrick(f){
+  const cz=f.brick&&D.cuPres?D.cuPres[f.brick]:null;
+  if(!cz) return `<div class="empty">No hay datos de CloseUp para el brick de este punto de venta.</div>`;
+  if(f.sin_datos) return `<div class="empty">Sin compras registradas para comparar con el brick.</div>`;
+  const esF=esFarmacia(f);
+  const arts=Object.keys(cz).filter(a=>P[a]&&cz[a][1]>0), Tz=arts.reduce((s,a)=>s+cz[a][1],0);
+  const uF=a=>{ const p=(f.productos||[]).find(x=>x.art==a); return p?(esF?(p.u12||0):(p.u||0)):0; };
+  const Tf=(f.productos||[]).reduce((s,p)=>s+(esF?(p.u12||0):(p.u||0)),0);
+  if(!Tz||!Tf) return `<div class="empty">No hay suficientes datos para comparar con el brick.</div>`;
+  const s=factorTam(arts.map(a=>[uF(a),cz[a][1]]), Tf/Tz);
+  const L=[];
+  arts.forEach(a=>{
+    const z=cz[a][1]/Tz; if(z<0.01) return;
+    const u=uF(a), exp=cz[a][1]*s, idx=u/exp, pot=exp-u;
+    if(idx>=0.6||pot<(esF?6:2)) return;
+    L.push({a, z, p:u/Tf, idx, exp, pot, u, zu:cz[a][1]});
+  });
+  L.sort((x,y)=>y.pot-x.pot);
+  const per=esF?'al año':'por mes';
+  return `<section class="sec"><div class="sec-h"><h2>Lo que debería venderse más</h2><span class="src">CloseUp · brick ${f.brick}</span></div>
+    <span class="small" style="margin-top:-4px">Productos que en el brick venden más de lo que ${esF?'compra esta farmacia':'vende esta sucursal'}, comparando con su relación habitual con el brick (CloseUp año móvil a ${esc(D.corte.closeup.replace(/\s*\(MAT\)/,''))} · ${esF?'Venta Real, 12 meses':'Sell-Out agosto'}).</span>
+    ${L.length?`<div class="acc">${L.slice(0,10).map(x=>`<div class="acc-i"><div class="t"><b>${esc(P[x.a].n)}</b><span class="num">+${n0(x.pot)} unid. ${per}</span></div>
+      <div class="meter" aria-hidden="true"><i style="width:${Math.min(100,Math.round(x.idx*100))}%"></i></div>
+      <p>${x.u===0?'<span class="chip-s inc">Incorporar</span> No lo '+(esF?'compra':'vende')+'. Al nivel del brick serían <b>'+n0(x.exp)+'</b>.':`Hoy ${n0(x.u)} unid. ${per}; al nivel del brick serían <b>${n0(x.exp)}</b>.`} En el brick es el ${nf1.format(x.z*100)}% de las unidades de Megalabs.</p></div>`).join('')}</div>`
+      :'<div class="empty">Ningún producto está claramente por debajo de lo que se vende en el brick.</div>'}
+  </section>`;
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-pedopt]'); if(b){ pedOpt=+b.dataset.pedopt; store.set('pedopt',pedOpt); renderFarmTab(); return; }
+  if(e.target.closest('#copiarP')) copiarPedido2();
+});
 
 // ================= Asistente: preguntas habladas o escritas =================
 const ASK={turns:[], busy:false, ctl:null, tools:false, mode:'', clickOnly:false, wasHold:false, discard:false, sr:null, srBlocked:false, recTxt:'', recStart:0, timer:null, holding:false};
@@ -1444,7 +1661,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.13';
+const APP_VERSION='1.14';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
