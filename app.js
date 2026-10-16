@@ -460,6 +460,13 @@ const EYE='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="c
 $('#eye').innerHTML=EYE_OFF;
 $('#eye').addEventListener('click',()=>{ const i=$('#lp'), vis=i.type==='password'; i.type=vis?'text':'password'; $('#eye').innerHTML=vis?EYE:EYE_OFF; $('#eye').setAttribute('aria-label', vis?'Ocultar contraseña':'Mostrar contraseña'); });
 $('#forgot').addEventListener('click',()=>{ const m=$('#lmsg'); m.className='hint'; m.textContent='Para recuperar el acceso, pedí una contraseña nueva al administrador de SmartBrick.'; });
+// Modo prueba (config.js → demo: {usuario, clave}): deja el usuario elegido y la contraseña cargada.
+function aplicarDemo(){
+  const d=CONFIG.demo; if(!d||!d.usuario||!USERS) return;
+  const u=USERS.usuarios.find(x=>x.nombre===d.usuario&&!x.sinDatos); if(!u) return;
+  $('#lu').value=u.nombre;
+  if(d.clave){ $('#lp').value=d.clave; lmsg('Versión de prueba: usuario y contraseña ya cargados. Tocá Iniciar Sesión.'); }
+}
 function lmsg(t,err){ const m=$('#lmsg'); m.className='hint'+(err?' err':''); m.textContent=t; }
 function loginBusy(on,txt){ const b=$('.btn-login'); b.disabled=on; b.textContent=on?(txt||'Verificando…'):'Iniciar Sesión'; }
 async function prepararLogin(){
@@ -469,6 +476,7 @@ async function prepararLogin(){
     const last=store.get('ultimoUsuario',null);
     if(last&&U.usuarios.some(u=>u.nombre===last&&!u.sinDatos)) $('#lu').value=last;
     lmsg('Elegí tu nombre e ingresá tu contraseña.');
+    aplicarDemo();
   }catch(e){ lmsg('No pude cargar la lista de usuarios. Revisá tu conexión y volvé a abrir SmartBrick.',true); }
 }
 $('#lu').addEventListener('change',e=>{ const u=USERS&&USERS.usuarios.find(x=>x.nombre===e.target.value); $('#lp').value='';
@@ -495,7 +503,7 @@ $('#loginForm').addEventListener('submit',async e=>{ e.preventDefault();
   }catch(err){ SES=null; sesion.set(null); lmsg(err.message||'No pude abrir los datos.',true); }
   finally{ loginBusy(false); }
 });
-$('#logout').addEventListener('click',()=>{ ttsStop(); sesion.set(null); SES=null; D=null; cur=null; ASK.turns=[]; closeSheet(); show('login'); });
+$('#logout').addEventListener('click',()=>{ ttsStop(); sesion.set(null); SES=null; D=null; cur=null; ASK.turns=[]; closeSheet(); show('login'); aplicarDemo(); });
 $('#cCartera').addEventListener('change',async e=>{ const sel=e.target; sel.disabled=true;
   try{ await cargarCartera(sel.value); renderMenu(); }
   catch(err){ alert(err.message||'No pude abrir esa cartera.'); sel.value=SES.cartera; }
@@ -1661,7 +1669,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.14';
+const APP_VERSION='1.15';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
