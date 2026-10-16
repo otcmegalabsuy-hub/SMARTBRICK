@@ -16,7 +16,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Roboto:wght@400;500;700;900&display=swap">
 <style>
 /* Layout: app por pantallas (login -> inicio -> farmacia -> marcas), columna centrada de hasta 560px; aspecto claro fijo según las referencias */
 :root{
@@ -53,7 +53,7 @@ h1,h2,h3{margin:0;font-weight:700;text-wrap:balance}
 .login{align-items:center;padding-inline:16px;background:radial-gradient(1200px 500px at 50% -10%, #F7F9FA, var(--bg))}
 .login .grow{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;padding-top:48px}
 .login-logo{height:58px;width:auto}
-.welcome{font-size:18px;font-weight:500;text-align:center;line-height:1.35;margin:22px 0 40px}
+.welcome{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;margin:32px 0 38px}.welcome .w1{font-family:"Montserrat",var(--font);font-size:17.5px;font-weight:400;line-height:1.3;color:var(--ink)}.welcome .w1 b{font-weight:700}.welcome .w2{font-family:"Montserrat",var(--font);background:var(--green-900);color:#fff;font-weight:700;font-size:clamp(12.5px,calc((100vw - 49px) / 19.1),19px);line-height:1.3;padding:1px 8px 2px;border-radius:5px;white-space:nowrap;letter-spacing:.005em}
 .lcard{width:100%;background:var(--surface);border-radius:10px;box-shadow:0 6px 24px rgba(20,30,26,.12),0 1px 3px rgba(20,30,26,.08);padding:14px 12px 12px;display:flex;flex-direction:column;gap:10px}
 .fld{position:relative;display:flex;align-items:center;border:1px solid #BFC7C5;border-radius:6px;height:44px;padding:0 10px;gap:8px;background:var(--surface)}
 .fld:focus-within{border-color:var(--green-700);box-shadow:0 0 0 1px var(--green-700)}
@@ -351,14 +351,14 @@ body{margin:0} img{max-width:100%} [hidden]{display:none!important}
 
 <!-- 0 · Cargando -->
 <section id="s-carga" class="screen carga">
-  <div class="grow"><img class="login-logo" alt="SmartBrick · Asistente de Ventas" src="img/logo.png"><div class="spin" aria-hidden="true"></div><p role="status">Abriendo SmartBrick…</p></div>
+  <div class="grow"><img class="login-logo" alt="SmartBrick" src="img/logo.png"><div class="spin" aria-hidden="true"></div><p role="status">Abriendo SmartBrick…</p></div>
 </section>
 
 <!-- 1 · Login -->
 <section id="s-login" class="screen login" hidden>
   <div class="grow">
-    <img class="login-logo" alt="SmartBrick · Asistente de Ventas" src="img/logo.png">
-    <h1 class="welcome">Bienvenido a SmartBrick,<br>Tu Asistente de Visita de Farmacias.</h1>
+    <img class="login-logo" alt="SmartBrick" src="img/logo.png">
+    <h1 class="welcome"><span class="w1">Hola, soy <b>SmartBrick</b>!</span><span class="w2">Tu Asistente de Visita de Farmacias.</span></h1>
     <form class="lcard" id="loginForm" novalidate>
       <div class="fld">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"></path></svg>
@@ -384,7 +384,7 @@ body{margin:0} img{max-width:100%} [hidden]{display:none!important}
 
 <!-- 2 · Inicio -->
 <section id="s-menu" class="screen" hidden>
-  <header class="hdr-c"><img alt="SmartBrick · Asistente de Ventas" src="img/logo.png"></header>
+  <header class="hdr-c"><img alt="SmartBrick" src="img/logo.png"></header>
   <div class="hello"><div class="wrap"><h1 id="hola"></h1><div class="navbtns"><button class="askbtn" aria-label="Preguntar: mantené apretado para hablar, o tocá para escribir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg><span class="lbl">Preguntar</span></button><button class="logout" id="logout" aria-label="Cerrar sesión" title="Cerrar sesión"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"></path><path d="M10 16l-4-4 4-4"></path><path d="M6 12h10"></path></svg><span class="sr">Cerrar sesión</span></button></div></div></div>
   <div class="grow"><div class="wrap menu">
     <h2>Selecciona tu tipo de visita:</h2>
@@ -417,7 +417,7 @@ body{margin:0} img{max-width:100%} [hidden]{display:none!important}
 
 <!-- 3 · Farmacia -->
 <section id="s-farm" class="screen" hidden>
-  <header class="hdr"><div class="wrap"><img alt="SmartBrick · Asistente de Ventas" src="img/logo.png"><div class="who"><b class="wname"></b><small class="wsub"></small></div></div></header>
+  <header class="hdr"><div class="wrap"><img alt="SmartBrick" src="img/logo.png"><div class="who"><b class="wname"></b><small class="wsub"></small></div></div></header>
   <div class="grow"><div class="wrap">
     <nav class="navrow" aria-label="Navegación"><button class="back" data-nav="menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg><span>Farmacias</span></button>
       <div class="navbtns"><button class="askbtn" aria-label="Preguntar: mantené apretado para hablar, o tocá para escribir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg><span class="lbl">Preguntar</span></button><button class="home" data-nav="menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</button></div></nav>
@@ -431,7 +431,7 @@ body{margin:0} img{max-width:100%} [hidden]{display:none!important}
 
 <!-- 3b · Resumen de la ruta -->
 <section id="s-ruta" class="screen" hidden>
-  <header class="hdr"><div class="wrap"><img alt="SmartBrick · Asistente de Ventas" src="img/logo.png"><div class="who"><b class="wname"></b><small class="wsub"></small></div></div></header>
+  <header class="hdr"><div class="wrap"><img alt="SmartBrick" src="img/logo.png"><div class="who"><b class="wname"></b><small class="wsub"></small></div></div></header>
   <div class="grow"><div class="wrap">
     <nav class="navrow" aria-label="Navegación"><button class="back" data-nav="menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg><span>Rutas</span></button>
       <div class="navbtns"><button class="askbtn" aria-label="Preguntar: mantené apretado para hablar, o tocá para escribir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg><span class="lbl">Preguntar</span></button><button class="home" data-nav="menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</button></div></nav>
@@ -442,7 +442,7 @@ body{margin:0} img{max-width:100%} [hidden]{display:none!important}
 
 <!-- 4 · Marcas -->
 <section id="s-marca" class="screen" hidden>
-  <header class="hdr"><div class="wrap"><img alt="SmartBrick · Asistente de Ventas" src="img/logo.png"><div class="who"><b class="wname"></b><small class="wsub"></small></div></div></header>
+  <header class="hdr"><div class="wrap"><img alt="SmartBrick" src="img/logo.png"><div class="who"><b class="wname"></b><small class="wsub"></small></div></div></header>
   <div class="grow"><div class="wrap">
     <nav class="navrow" aria-label="Navegación"><button class="back" data-nav="farm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg><span id="mback"></span></button>
       <div class="navbtns"><button class="askbtn" aria-label="Preguntar: mantené apretado para hablar, o tocá para escribir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg><span class="lbl">Preguntar</span></button><button class="home" data-nav="menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Inicio</button></div></nav>
