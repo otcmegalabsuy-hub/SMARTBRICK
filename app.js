@@ -1107,22 +1107,21 @@ function marcaScreen(f){
 
 
 
-// ---- v1.14 · Ficha en dos grupos: CHECKEAR (lo que pasó) y ACCIONAR (qué hacer)
+// ---- v1.14 · Ficha en dos grupos: CHEQUEAR (lo que pasó) y ACCIONAR (qué hacer)
 (function(){ const st=document.createElement('style'); st.textContent=`
 /* v1.16: sin el buscador de farmacias (se elige en la lista) */
 .cfg label[for="cBuscar"]{display:none!important}
-#tabs.tabs{display:flex;flex-direction:column;gap:8px;background:none;border:0;padding:0}
-/* v1.21 · CHECKEAR / ACCIONAR: barra de encabezado y fila de pestañas con la punta sobre la elegida */
-#tabs.tabs{gap:14px}
-.tgrp{display:flex;flex-direction:column;gap:0}
-.tlab{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:38px;border-radius:8px;background:#A6DCD7;border:1.5px solid #7CC9C2;font-size:13.5px;font-weight:800;letter-spacing:.13em;color:var(--tq-text);padding:0 10px;margin-bottom:10px}
+#tabs.tabs{display:flex;flex-direction:column}
+/* v1.26 · CHEQUEAR / ACCIONAR integrados en una sola tarjeta; la punta baja del encabezado hacia la pestaña elegida */
+#tabs.tabs{gap:0;background:var(--surface);border:1.5px solid var(--brand);border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(20,30,26,.07);padding:0}
+.tgrp{display:flex;flex-direction:column;gap:0;--cx:-40px}
+.tgrp+.tgrp{border-top:1.5px solid var(--brand)}
+.tlab{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:36px;background:#A6DCD7;font-size:13.5px;font-weight:800;letter-spacing:.13em;color:var(--tq-text);padding:0 10px}
 .tlab .ti{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--tq-text);color:#fff;flex-shrink:0}
 .tlab .tv{color:var(--tq-text);margin-left:-3px}
-.trow{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;background:var(--surface);border:1.5px solid var(--brand);border-radius:10px;padding:6px;box-shadow:0 2px 8px rgba(20,30,26,.06);--cx:11px}
-.trow::before,.trow::after{content:'';position:absolute;left:var(--cx);border:8px solid transparent;border-top:0;transition:left .2s ease}
-.trow::before{top:-8px;border-bottom-color:var(--brand)}
-.trow::after{top:-6px;border-bottom-color:var(--surface)}
-@media (prefers-reduced-motion:reduce){.trow::before,.trow::after{transition:none}}
+.tlab::after{content:'';position:absolute;bottom:-8px;left:var(--cx);border:8px solid transparent;border-bottom:0;border-top-color:#A6DCD7;transition:left .2s ease}
+.trow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:10px 6px 6px;background:transparent}
+@media (prefers-reduced-motion:reduce){.tlab::after{transition:none}}
 .tgrp .tab{min-height:44px;border-radius:7px;background:#E7EBEC;font-size:12.5px;font-weight:600;line-height:1.15;padding:2px 3px;color:var(--ink)}
 .tgrp .tab[aria-selected="true"]{background:var(--brand-soft);box-shadow:inset 0 0 0 2px var(--brand);color:var(--tq-text);font-weight:700}
 .opt3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
@@ -1161,14 +1160,14 @@ function tabsHTML(f){
   const IAC='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.6z"/></svg>';
   const IV='<svg class="tv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
   requestAnimationFrame(posCaret);
-  return `<div class="tgrp"><span class="tlab" id="tl-chk"><span class="ti">${ICK}</span>CHECKEAR${IV}</span><div class="trow" role="tablist" aria-labelledby="tl-chk">${TABS_INFO(f).map(b).join('')}</div></div>
+  return `<div class="tgrp"><span class="tlab" id="tl-chk"><span class="ti">${ICK}</span>CHEQUEAR${IV}</span><div class="trow" role="tablist" aria-labelledby="tl-chk">${TABS_INFO(f).map(b).join('')}</div></div>
     <div class="tgrp"><span class="tlab" id="tl-acc"><span class="ti">${IAC}</span>ACCIONAR${IV}</span><div class="trow" role="tablist" aria-labelledby="tl-acc">${TABS_ACC.map(b).join('')}</div></div>`;
 }
 // La punta del globo se ubica sobre la pestaña elegida de cada fila (si no hay ninguna, queda a la izquierda).
 function posCaret(){
-  document.querySelectorAll('#tabs .trow').forEach(r=>{
-    const t=r.querySelector('.tab[aria-selected="true"]');
-    r.style.setProperty('--cx', (t&&t.offsetWidth ? Math.round(t.offsetLeft+t.offsetWidth/2-8) : 11)+'px');
+  document.querySelectorAll('#tabs .tgrp').forEach(g=>{
+    const r=g.querySelector('.trow'), t=r&&r.querySelector('.tab[aria-selected="true"]');
+    g.style.setProperty('--cx', (t&&t.offsetWidth ? Math.round(t.offsetLeft-r.offsetLeft+t.offsetWidth/2-8) : -40)+'px');
   });
 }
 document.addEventListener('click',e=>{ if(e.target.closest('#tabs .tab')) requestAnimationFrame(posCaret); });
@@ -1744,7 +1743,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.25';
+const APP_VERSION='1.26';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
