@@ -1,7 +1,7 @@
 /* SmartBrick · app web (Megalabs). Generado a partir del prototipo. */
 (function(){
 let D=null, P=null, Z=null, F=null;
-function setData(d){ D=d; P=d.productos; Z=d.zonas; F=d.fichas; MI=d.meses; }
+function setData(d){ D=d; P=d.productos; Z=d.zonas; F=d.fichas; MI=d.meses; enriquecerFuentes(); }
 const $ = s => document.querySelector(s);
 const nf0 = new Intl.NumberFormat('es-UY',{maximumFractionDigits:0});
 const nf1 = new Intl.NumberFormat('es-UY',{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -42,8 +42,9 @@ function resumen(f){
       <div class="kpi"><span class="l">Compras OTC ene–ago 2026</span><span class="v num">${moneyC(k.otc_ytd26)}</span><span class="s num"><span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. 2025</span></div>
       <div class="kpi"><span class="l">Último trimestre (jun–ago)</span><span class="v num">${moneyC(k.otc_q26)}</span><span class="s num"><span class="${cls(k.otc_q_var)}">${pct(k.otc_q_var)}</span> vs. 2025</span></div>
       <div class="kpi"><span class="l">Última compra OTC</span><span class="v num">${k.dias_otc==null?'–':k.dias_otc+' días'}</span><span class="s">${fdate(k.ult_otc)}</span></div>
-      <div class="kpi"><span class="l">Total Megalabs 2026</span><span class="v num">${moneyC(k.total_ytd26)}</span><span class="s num"><span class="${cls(k.total_var)}">${pct(k.total_var)}</span> · todas las líneas</span></div>
+      <div class="kpi"><span class="l">Total Megalabs ene-ago 2026</span><span class="v num">${moneyC(k.total_ytd26)}</span><span class="s num"><span class="${cls(k.total_var)}">${pct(k.total_var)}</span> · todas las líneas</span></div>
     </div>
+    <span class="small">Venta Real (compras a Megalabs, $ netos), datos al ${D.corte.venta_real}. Los días desde la última compra se cuentan a esa fecha.</span>
     <section class="sec"><div class="sec-h"><h2>Qué mirar antes de entrar</h2></div>${alertsHTML(f)}</section>
     <section class="sec"><div class="sec-h"><h2>Compras OTC por mes</h2><span class="src">Venta Real · $ netos</span></div>
       <div class="legend"><span><i style="background:var(--series-prev)"></i>2025</span><span><i style="background:var(--brand)"></i>2026</span></div>
@@ -58,6 +59,7 @@ function resumen(f){
       <div class="kpi"><span class="l">Contra la sucursal promedio</span><span class="v num">${k.indice}</span><span class="s">100 = promedio (${n0(k.prom_cadena)} unid.)</span></div>
       <div class="kpi"><span class="l">Puesto en la cadena</span><span class="v num">${k.rank}<span style="font-size:14px;color:var(--muted)"> de ${k.n_suc}</span></span><span class="s">por unidades en agosto</span></div>
     </div>
+    <span class="small">Sell-Out ${TIPO[f.tipo]}, ${perSO()}: unidades y venta sin IVA de productos OTC Megalabs.</span>
     <section class="sec"><div class="sec-h"><h2>Qué mirar antes de entrar</h2></div>${alertsHTML(f)}</section>
     <section class="sec"><div class="sec-h"><h2>Ventas por marca en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · unidades</span></div>${barrasMarca(f.marcas)}</section>`;
 }
@@ -182,7 +184,7 @@ function insights(x){
     if(x.cartPos) L.push([`Este brick está ${x.cartPos}º de ${x.cart.length} en tu cartera por share de ${mb} (promedio de la cartera: ${nf1.format(x.cartAvg)}%).`,'CloseUp']);
   } else if(Z[f.brick]) L.push([`CloseUp no registra ventas de ${mb} en este brick.`,'CloseUp']);
   if(!L.length) return '';
-  return `<section class="sec"><div class="sec-h"><h2>Lo más importante</h2><span class="src">${esc(mb)}</span></div><ul class="ins">${L.map(([t,s])=>`<li>${t} <em>${esc(s)}</em></li>`).join('')}</ul></section>`;
+  return `<section class="sec"><div class="sec-h"><h2>Lo más importante</h2><span class="src">${esc(mb)}</span></div><ul class="ins">${L.map(([t,s])=>`<li>${t} <em>${esc(srcLbl(s))}</em></li>`).join('')}</ul></section>`;
 }
 
 function hrows(rows){ // rows: {label, tag, w (0-100), cls, val, sub, subCls}
@@ -223,11 +225,11 @@ function marcaView(f){
           <div class="kpi"><span class="l">Última compra de la marca</span><span class="v num">${x.dias==null?'–':x.dias+' días'}</span><span class="s">${fdate(x.ult)}</span></div>
           <div class="kpi"><span class="l">Meses con compra</span><span class="v num">${x.meses12}<span style="font-size:14px;color:var(--muted)"> de 12</span></span><span class="s">sep-25 a ago-26</span></div>
         </div></section>
-        <section class="sec"><div class="sec-h"><h2>Unidades por mes</h2><span class="src">Venta Real · cajas</span></div>
+        <section class="sec"><div class="sec-h"><h2>Unidades por mes</h2><span class="src">Venta Real · cajas · al ${D.corte.venta_real}</span></div>
           <div class="legend"><span><i style="background:var(--series-prev)"></i>2025</span><span><i style="background:var(--brand)"></i>2026</span></div>
           <div class="chart" data-chart="marca">${chartYoY(map,'marca',{label:'Unidades de '+mb+' por mes',axis:v=>nf0.format(v),val:v=>n0(v)+' unid.'})}</div>
           <div class="readout num"></div><span class="small">Septiembre 2026 incluye compras hasta el ${D.corte.venta_real}.</span></section>
-        <section class="sec"><div class="sec-h"><h2>Presentaciones que compra</h2><span class="src">Últimos 12 meses · cajas</span></div>
+        <section class="sec"><div class="sec-h"><h2>Presentaciones que compra</h2><span class="src">Venta Real · 12 meses al ${D.corte.venta_real} · cajas</span></div>
           ${hrows(rows.map(r=>({label:esc(P[r.a].n), w:r.u/mx*100, cls:r.u>0?'b-sel':'b-oth', val:r.u>0?n0(r.u):'<span class="kind incorporar" style="margin:0">no compra</span>', sub:r.p&&r.p.dias!=null?'hace '+r.p.dias+' d':null, title:P[r.a].n})))}
         </section>`;
     }
@@ -262,18 +264,18 @@ function marcaView(f){
         <div class="kpi"><span class="l">Mercado de la categoría</span><span class="v num">${moneyC(x.mkt)}</span><span class="s num"><span class="${cls(x.mktG)}">${pct(x.mktG)}</span> año móvil</span></div>
         <div class="kpi"><span class="l">${esc(mb)} en la zona</span><span class="v num">${n0(x.brU)} <span style="font-size:13px;color:var(--muted)">unid.</span></span><span class="s num"><span class="${cls(x.brUG)}">${pct(x.brUG)}</span> año móvil</span></div>
       </div></section>
-      <section class="sec"><div class="sec-h"><h2>Share por período</h2><span class="src">CloseUp · % del mercado en $</span></div>
+      <section class="sec"><div class="sec-h"><h2>Share por período</h2><span class="src">CloseUp, ${perCU()} · % del mercado en $</span></div>
         <div class="legend"><span><i style="background:var(--series-prev)"></i>Año anterior</span><span><i style="background:var(--brand)"></i>Actual (a julio 2026)</span></div>
         <div class="chart">${sharePeriods(x.sh)}</div>
         <span class="small">Si el último trimestre y el último mes están por encima del año móvil, la marca viene ganando terreno.</span></section>
-      <section class="sec"><div class="sec-h"><h2>Ranking de ${esc(catName(x.cat).toLowerCase())}</h2><span class="src">Share año móvil · crec. en $</span></div>
+      <section class="sec"><div class="sec-h"><h2>Ranking de ${esc(catName(x.cat).toLowerCase())}</h2><span class="src">CloseUp, share ${perCU()} · crec. en $</span></div>
         <div class="legend"><span><i style="background:var(--brand)"></i>${esc(mb)}</span><span><i style="background:var(--series-grp)"></i>Grupo Megalabs</span><span><i style="background:var(--series-prev)"></i>Competidores</span></div>
         ${hrows(top.map(r=>{ const s=r.v[7]/T[7]*100, g=gr(r.v[7],r.v[6]); return {label:esc(r.b?marca(r.b):r.p), tag:(r.g&&r.b!==x.b?'<span class="g">GRUPO</span>':''), w:s/mxs*100, cls:r===x.row?'b-sel':(r.g?'b-grp':'b-oth'), val:nf1.format(s)+'%', sub:g==null?'nuevo':pct(g), subCls:cls(g), title:(r.c||'')}; }))}
         ${x.riser?`<span class="small">Competidor que más gana: <b style="color:var(--ink)">${esc(x.riser.producto)}</b> (${esc(x.riser.corp)}), ${pp(x.riser.delta_pp)} en el año.</span>`:''}
       </section>`;
     if(x.mix && x.mix.length){
       const mxm=Math.max(1,...x.mix.map(m=>Math.max(m.z,m.f)));
-      h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones: zona contra ${esFarmacia(f)?'farmacia':'sucursal'}</h2><span class="src">% de la marca en unidades</span></div>
+      h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones: zona contra ${esFarmacia(f)?'farmacia':'sucursal'}</h2><span class="src">% de la marca en unidades · CloseUp y ${esF?'Venta Real':'Sell-Out'}</span></div>
         <div class="legend"><span><i style="background:var(--series-zone)"></i>Zona (CloseUp, año móvil)</span><span><i style="background:var(--brand)"></i>${esFarmacia(f)?'Farmacia (Venta Real, 12 meses)':'Sucursal (agosto)'}</span></div>
         <div class="hrows">${x.mix.map(m=>`<div class="hrow2"><span class="hl">${esc(P[m.a].n)}</span><div class="pair"><span class="hbar b-zone" style="width:${Math.max(1.5,m.z/mxm*100)}%"></span><span class="hbar b-sel" style="width:${Math.max(1.5,m.f/mxm*100)}%"></span></div><span class="hv num">${nf0.format(m.z)}%<small>${nf0.format(m.f)}%</small></span></div>`).join('')}</div>
         <span class="small">Cuando una presentación pesa mucho más en la zona que en ${esFarmacia(f)?'la farmacia':'la sucursal'}, conviene proponerla.</span></section>`;
@@ -315,9 +317,9 @@ function compras(f){
   const lista = arr => `<div class="tscroll"><table><thead><tr><th>Producto</th><th class="r">Últ. 12 meses</th><th class="r">Última compra</th></tr></thead><tbody>${arr.map(p=>`<tr><td>${esc(p.n)}</td><td class="r num">${n0(p.u12)}</td><td class="r num">${p.dias==null?'–':'hace '+p.dias+' d'}</td></tr>`).join('')}</tbody></table></div>`;
   return `<section class="sec"><div class="sec-h"><h2>Compras por marca</h2><span class="src">Venta Real · CloseUp</span></div>
       <div class="legend"><span><i style="background:var(--brand)"></i>Peso en las compras de la farmacia</span><span><i style="background:var(--series-zone)"></i>Peso en la venta de su zona</span></div>${tabla}
-      <span class="small">Si una marca pesa mucho más en la zona que en la farmacia, hay espacio para crecer en surtido. Tocá una marca para ver sus tableros.</span></section>
-    ${dejo.length?`<section class="sec"><div class="sec-h"><h2>Dejó de comprar</h2><span class="src">${dejo.length} producto${dejo.length>1?'s':''}</span></div><span class="small">Los compró entre junio y septiembre de 2025 y en el mismo período de 2026 no.</span>${lista(dejo)}</section>`:''}
-    <section class="sec"><div class="sec-h"><h2>Lo que compra</h2><span class="src">${act.length} productos · unid. de venta</span></div>${lista(act)}</section>
+      <span class="small">Farmacia: Venta Real, ene–ago 2026 contra ene–ago 2025 ($ netos). Zona: CloseUp, ${perCU()}. Si una marca pesa mucho más en la zona que en la farmacia, hay espacio para crecer en surtido. Tocá una marca para ver sus tableros.</span></section>
+    ${dejo.length?`<section class="sec"><div class="sec-h"><h2>Dejó de comprar</h2><span class="src">${dejo.length} producto${dejo.length>1?'s':''}</span></div><span class="small">Los compró entre junio y septiembre de 2025 y en el mismo período de 2026 no (Venta Real al ${D.corte.venta_real}).</span>${lista(dejo)}</section>`:''}
+    <section class="sec"><div class="sec-h"><h2>Lo que compra</h2><span class="src">${act.length} productos · Venta Real, 12 meses al ${D.corte.venta_real}</span></div>${lista(act)}</section>
     ${nunca.length?`<section class="sec"><details><summary>No compró nunca (${nunca.length} productos)</summary><div class="small" style="padding-top:6px">${nunca.map(p=>esc(p.n)).join(' · ')}</div></details></section>`:''}`;
 }
 
@@ -328,7 +330,7 @@ function ventas(f){
   const flag=p=>{ if(fs&&p.listado&&(p.stock||0)<=0&&p.u_cadena>=3) return '<span class="kind recuperar">sin stock</span>';
     if(fs&&p.listado&&(p.stock||0)>=3&&(p.u||0)===0&&p.u_cadena>=2) return '<span class="kind incorporar">sin rotación</span>';
     if(!fs&&(p.u||0)===0&&p.u_cadena>=2) return '<span class="kind revisar">sin venta</span>'; return ''; };
-  return `<section class="sec"><div class="sec-h"><h2>Productos en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]}</span></div>
+  return `<section class="sec"><div class="sec-h"><h2>Productos en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · ${perSO()}</span></div>
     <div class="tscroll"><table><thead><tr><th>Producto</th><th class="r">Unid.</th>${fs?'<th class="r">Stock</th><th class="r">Cob.</th>':''}<th class="r">Prom.</th></tr></thead><tbody>${
       R.map(p=>`<tr><td>${flag(p)}${esc(p.n)}</td><td class="r num" style="font-weight:700">${n0(p.u)}</td>${fs?`<td class="r num">${p.stock==null?'–':n0(p.stock)}</td><td class="r num">${p.cob==null?'–':nf1.format(p.cob)+' sem'}</td>`:''}<td class="r num">${nf1.format(p.u_cadena||0)}</td></tr>`).join('')}</tbody></table></div>
     <span class="small">${fs?'Cob. = semanas de cobertura (stock al cierre ÷ venta semanal de agosto). ':''}Prom. = unidades por sucursal de la cadena en agosto.</span></section>`;
@@ -547,7 +549,7 @@ function preview(){
   if(!f){ el.innerHTML=''; return; }
   const a=topLevel(f);
   el.innerHTML=`<span>${TIPO[f.tipo]} · ${f.brick?'Brick '+f.brick+' · '+esc(zonaCorta(f.brick)):'Sin brick asignado'}</span>`+
-    (a?`<span><i class="dot ${a.nivel}"></i><b>${esc(a.titulo)}</b></span>`:'<span><i class="dot nada"></i>Sin alertas</span>');
+    (a?`<span><i class="dot ${a.nivel}"></i><b>${esc(a.titulo)}</b></span><span style="font-size:12px;color:#fff;opacity:.92">${esc(a.fuente)}</span>`:'<span><i class="dot nada"></i>Sin alertas</span>');
 }
 document.querySelectorAll('.mode').forEach(m=>m.addEventListener('click',()=>{ if(MST.mode!==m.dataset.mode){ MST.q=''; $('#cBuscar').value=''; } MST.mode=m.dataset.mode; store.set('mode',MST.mode); renderMenu(); }));
 $('#cTipo').addEventListener('change',e=>{ MST.tipo=e.target.value; store.set('tipo',MST.tipo); renderMenu(); });
@@ -661,8 +663,8 @@ const zonaDe=f=>Z[f.brick]?String(f.brick):'sin';
 function kpiLine(f){
   if(f.sin_datos) return 'Sin compras registradas en Venta Real desde enero de 2025.';
   const k=f.kpi||{};
-  if(esFarmacia(f)) return `Compras OTC 2026: <b>${moneyC(k.otc_ytd26)}</b> <span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. 2025 · última compra ${k.dias_otc==null?'–':'hace '+k.dias_otc+(k.dias_otc===1?' día':' días')}`;
-  return `Sell-out agosto: <b>${n0(k.unid)} unid.</b> · índice ${k.indice==null?'–':k.indice} · puesto ${k.rank} de ${k.n_suc}`;
+  if(esFarmacia(f)) return `Compras OTC ene–ago 2026: <b>${moneyC(k.otc_ytd26)}</b> <span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. 2025 · última compra ${fdate(k.ult_otc)} <span class="small">(Venta Real al ${D.corte.venta_real})</span>`;
+  return `Sell-out ${perSO()}: <b>${n0(k.unid)} unid.</b> · índice ${k.indice==null?'–':k.indice} · puesto ${k.rank} de ${k.n_suc} <span class="small">(Sell-Out ${TIPO[f.tipo]})</span>`;
 }
 // resumen corto de cada alerta para la vista unificada
 const RES_ALERTA={
@@ -682,14 +684,14 @@ function panoramaGrupos(ids){
   const grupos={};
   ids.forEach((id,i)=>{ const f=fById(id);
     (f.alertas||[]).forEach(a=>{ const g=RES_ALERTA[a.tipo]; if(!g) return;
-      const G=grupos[a.tipo]||(grupos[a.tipo]={tipo:a.tipo,label:g[0],nivel:a.nivel,items:{}});
+      const G=grupos[a.tipo]||(grupos[a.tipo]={tipo:a.tipo,label:g[0],nivel:a.nivel,items:{},src:new Set()}); G.src.add(a.fuente);
       if(ORD_NIV[a.nivel]<ORD_NIV[G.nivel]) G.nivel=a.nivel;
       const it=G.items[id]||(G.items[id]={i,f,txt:[]}); it.txt.push(g[1](a)); }); });
   return Object.values(grupos).sort((a,b)=>ORD_NIV[a.nivel]-ORD_NIV[b.nivel]||Object.keys(b.items).length-Object.keys(a.items).length)
     .map(G=>Object.assign(G,{lista:Object.values(G.items).sort((a,b)=>a.i-b.i)}));
 }
 function panorama(ids){
-  return panoramaGrupos(ids).map((G,gi)=>`<div class="rr-it" data-say="g${gi}">${pillG(G.nivel)}<div><b>${esc(G.label)}</b><p>${G.lista.map(it=>`<span class="rr-num">${it.i+1}</span>${esc(it.f.nombre)} (${esc(it.txt.join(', '))})`).join(' · ')}</p></div></div>`).join('');
+  return panoramaGrupos(ids).map((G,gi)=>`<div class="rr-it" data-say="g${gi}">${pillG(G.nivel)}<div><b>${esc(G.label)}</b><p class="rr-src" style="font-size:11.5px;opacity:.85;margin:1px 0 2px">${esc([...G.src].join(' | '))}</p><p>${G.lista.map(it=>`<span class="rr-num">${it.i+1}</span>${esc(it.f.nombre)} (${esc(it.txt.join(', '))})`).join(' · ')}</p></div></div>`).join('');
 }
 function zonaCard(b,items,zi){
   const nums=items.map(({f,i})=>`<span class="rr-num">${i+1}</span>${esc(f.nombre)}`).join('<br>');
@@ -735,10 +737,11 @@ function renderRutaRes(){
   h+=`<div class="kpis">
       <div class="kpi"><span class="l">Paradas</span><span class="v num">${fs.length}</span><span class="s">en ${nz} zona${nz>1?'s':''}</span></div>
       <div class="kpi"><span class="l">Alertas altas</span><span class="v num ${altas?'down':''}">${altas}</span><span class="s">y ${medias} media${medias===1?'':'s'}</span></div>
-      ${ind.length?`<div class="kpi"><span class="l">Compras OTC 2026</span><span class="v num">${moneyC(c26)}</span><span class="s num"><span class="${cls(gr(c26,c25))}">${pct(gr(c26,c25))}</span> vs. 2025 · ${ind.length} farmacia${ind.length>1?'s':''}</span></div>`
+      ${ind.length?`<div class="kpi"><span class="l">Compras OTC ene–ago 2026</span><span class="v num">${moneyC(c26)}</span><span class="s num"><span class="${cls(gr(c26,c25))}">${pct(gr(c26,c25))}</span> vs. 2025 · ${ind.length} farmacia${ind.length>1?'s':''}</span></div>`
         :`<div class="kpi"><span class="l">Sell-out agosto</span><span class="v num">${n0(uS)}</span><span class="s">unidades en ${cad.length} sucursal${cad.length>1?'es':''}</span></div>`}
       <div class="kpi"><span class="l">Pedido sugerido</span><span class="v num">${ped.length}</span><span class="s">producto${ped.length===1?'':'s'} en total</span></div>
-    </div>`;
+    </div>
+    <span class="small">Compras: Venta Real, ene–ago 2026 contra 2025 (datos al ${D.corte.venta_real}). Alertas: Venta Real, CloseUp (${perCU()}) y Sell-Out de cadenas (${perSO()}). Pedido sugerido: compras de sep–oct 2025 y promedio de 12 meses (Venta Real) y venta de la zona (CloseUp).</span>`;
   const pan=panorama(R.ids);
   h+=`<section class="green qm"><div class="green-h"><h2>Qué mirar en esta ruta</h2>${btnEscuchar('ruta')}</div><p class="qm-sub">Resumen de todas las paradas</p>
       ${pan?`<div class="rr-items">${pan}</div>`:'<p class="gempty">Ninguna farmacia de la ruta tiene alertas.</p>'}
@@ -955,8 +958,9 @@ function resumenV2(f){
       <div class="kpi"><span class="l">Compras OTC ene-ago 2026</span><span class="v num">${moneyC(k.otc_ytd26)}</span><span class="s num"><span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. 2025</span></div>
       <div class="kpi"><span class="l">Último trimestre (jun-ago)</span><span class="v num">${moneyC(k.otc_q26)}</span><span class="s num"><span class="${cls(k.otc_q_var)}">${pct(k.otc_q_var)}</span> vs. 2025</span></div>
       <div class="kpi"><span class="l">Última compra OTC</span><span class="v num">${k.dias_otc==null?'–':k.dias_otc+(k.dias_otc===1?' día':' días')}</span><span class="s">${fdate(k.ult_otc)}</span></div>
-      <div class="kpi"><span class="l">Total Megalabs 2026</span><span class="v num">${moneyC(k.total_ytd26)}</span><span class="s num"><span class="${cls(k.total_var)}">${pct(k.total_var)}</span> todas las líneas</span></div>
+      <div class="kpi"><span class="l">Total Megalabs ene-ago 2026</span><span class="v num">${moneyC(k.total_ytd26)}</span><span class="s num"><span class="${cls(k.total_var)}">${pct(k.total_var)}</span> todas las líneas</span></div>
     </div>
+    <span class="small">Venta Real (compras a Megalabs, $ netos), datos al ${D.corte.venta_real}. Los días desde la última compra se cuentan a esa fecha.</span>
     ${greenPanel(f)}
     <section class="sec"><div class="sec-h"><h2>Compras OTC por mes</h2><span class="src">Venta Real · $ netos</span></div>
       <div class="legend"><span><i style="background:var(--series-prev)"></i>2025</span><span><i style="background:var(--brand)"></i>2026</span></div>
@@ -969,6 +973,7 @@ function resumenV2(f){
       <div class="kpi"><span class="l">Contra sucursal promedio</span><span class="v num ${k.indice>=100?'up':'down'}">${k.indice}</span><span class="s">100 = promedio (${n0(k.prom_cadena)} unid.)</span></div>
       <div class="kpi"><span class="l">Puesto en la cadena</span><span class="v num">${k.rank}<span style="font-size:15px;color:var(--muted)"> de ${k.n_suc}</span></span><span class="s">por unidades en agosto</span></div>
     </div>
+    <span class="small">Sell-Out ${TIPO[f.tipo]}, ${perSO()}: unidades y venta sin IVA de productos OTC Megalabs.</span>
     ${greenPanel(f)}
     <section class="sec"><div class="sec-h"><h2>Ventas por marca en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · unidades</span></div>${barrasMarca(f.marcas)}</section>
     ${BTN_MARCAS}`;
@@ -1020,7 +1025,7 @@ function marcaScreen(f){
     if(gap && (esF? x.u26>0 : true)) I.push(['layers',`<b>${esc(P[gap.a].n)}: ${nf0.format(gap.z)}% de la marca en la zona y ${nf0.format(gap.f)}% ${esF?'en esta farmacia':'en esta sucursal'}.</b><small>Es la presentación con más espacio para proponer.</small>`,'CloseUp · '+(esF?'Venta Real':'Sell-Out')]);
     if(x.riser) I.push(['trend',`<b>Competidor que más gana: ${esc(x.riser.producto)}.</b><small>${esc(x.riser.corp)}, ${pp(x.riser.delta_pp)} de share en el año.</small>`,'CloseUp']);
   } else if(Z[f.brick]) I.push(['pie',`<b>CloseUp no registra ventas de ${esc(mb)} en este brick.</b>`,'CloseUp']);
-  h+=`<h2 class="mhead">Lo más importante</h2>`+I.map(([ic,t,s])=>`<div class="icard">${svgI(ic)}<div class="t">${t}</div><div class="f">${esc(s)}</div></div>`).join('');
+  h+=`<h2 class="mhead">Lo más importante</h2>`+I.map(([ic,t,s])=>`<div class="icard">${svgI(ic)}<div class="t">${t}</div><div class="f">${esc(srcLbl(s))}</div></div>`).join('');
   // Detalles
   h+=`<h2 class="mhead">Detalles ${esc(mb)}</h2>`;
   if(esF){
@@ -1034,11 +1039,11 @@ function marcaScreen(f){
       const map={}; MI.forEach((m,i)=>map[m]=x.mm[i]);
       const rows=x.sk.map(a=>({a,u:(x.perSku[a]||{u12:0}).u12,p:f.productos.find(p=>String(p.art)===a)})).sort((r1,r2)=>r2.u-r1.u);
       const mx=Math.max(1,...rows.map(r=>r.u));
-      h+=`<section class="sec"><div class="sec-h"><h2>Unidades por mes</h2><span class="src">Venta Real · cajas</span></div>
+      h+=`<section class="sec"><div class="sec-h"><h2>Unidades por mes</h2><span class="src">Venta Real · cajas · al ${D.corte.venta_real}</span></div>
           <div class="legend"><span><i style="background:var(--series-prev)"></i>2025</span><span><i style="background:var(--brand)"></i>2026</span></div>
           <div class="chart" data-chart="marca">${chartYoY(map,'marca',{label:'Unidades de '+mb+' por mes',axis:v=>nf0.format(v),val:v=>n0(v)+' unid.'})}</div>
           <div class="readout num"></div><span class="small">Septiembre 2026 incluye compras hasta el ${D.corte.venta_real}.</span></section>
-        <section class="sec"><div class="sec-h"><h2>Presentaciones que compra</h2><span class="src">Últimos 12 meses · cajas</span></div>
+        <section class="sec"><div class="sec-h"><h2>Presentaciones que compra</h2><span class="src">Venta Real · 12 meses al ${D.corte.venta_real} · cajas</span></div>
           ${hrows(rows.map(r=>({label:esc(P[r.a].n),w:r.u/mx*100,cls:r.u>0?'b-sel':'b-oth',val:r.u>0?n0(r.u):'<span class="kind incorporar" style="margin:0">no compra</span>',sub:r.p&&r.p.dias!=null?'hace '+r.p.dias+' d':null,title:P[r.a].n})))}</section>`;
     }
   } else if(!f.sin_datos){
@@ -1048,7 +1053,7 @@ function marcaScreen(f){
       <div class="dcard"><span class="l">Presentaciones con venta en agosto</span><span class="v num">${x.ps.filter(p=>(p.u||0)>0).length} de ${x.sk.length}</span><span class="s">${fs?x.sinStock.length+' sin stock al cierre':'San Roque no informa stock'}</span></div>`;
     const ps=x.ps.slice().sort((p1,p2)=>(p2.u||0)-(p1.u||0)||p2.u_cadena-p1.u_cadena);
     const mx=Math.max(1,...ps.map(p=>Math.max(p.u||0,p.u_cadena||0)));
-    h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]}</span></div>
+    h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · ${perSO()}</span></div>
       <div class="legend"><span><i style="background:var(--brand)"></i>Esta sucursal</span><span><i style="background:var(--series-prev)"></i>Sucursal promedio</span></div>
       <div class="hrows">${ps.map(p=>`<div class="hrow2"><span class="hl">${esc(P[p.art].n)}${fs&&p.listado&&(p.stock||0)<=0?' <span class="kind recuperar">sin stock</span>':''}</span>
         <div class="pair"><span class="hbar b-sel" style="width:${Math.max(1.5,(p.u||0)/mx*100)}%"></span><span class="hbar b-oth" style="width:${Math.max(1.5,(p.u_cadena||0)/mx*100)}%"></span></div>
@@ -1069,23 +1074,23 @@ function marcaScreen(f){
         <div class="kpi"><span class="l">Mercado de la categoría</span><span class="v num">${moneyC(x.mkt)}</span><span class="s num">${sp(x.mktG,pct(x.mktG))} año móvil</span></div>
         <div class="kpi"><span class="l">${esc(mb)} en la zona</span><span class="v num">${n0(x.brU)}<span style="font-size:14px;color:var(--muted)"> unid.</span></span><span class="s num">${sp(x.brUG,pct(x.brUG))} año móvil</span></div>
       </div>
-      <section class="sec"><div class="sec-h"><h2>Share por período</h2><span class="src">CloseUp · % del mercado en $</span></div>
+      <section class="sec"><div class="sec-h"><h2>Share por período</h2><span class="src">CloseUp, ${perCU()} · % del mercado en $</span></div>
         <div class="legend"><span><i style="background:var(--series-prev)"></i>Año anterior</span><span><i style="background:var(--brand)"></i>Actual (a julio 2026)</span></div>
         <div class="chart">${sharePeriods(x.sh)}</div>
         <span class="small">Si el último trimestre y el último mes superan al año móvil, la marca viene ganando terreno.</span></section>
-      <section class="sec"><div class="sec-h"><h2>Ranking de ${esc(catName(x.cat).toLowerCase())}</h2><span class="src">Share año móvil · crec. en $</span></div>
+      <section class="sec"><div class="sec-h"><h2>Ranking de ${esc(catName(x.cat).toLowerCase())}</h2><span class="src">CloseUp, share ${perCU()} · crec. en $</span></div>
         <div class="legend"><span><i style="background:var(--brand)"></i>${esc(mb)}</span><span><i style="background:var(--series-grp)"></i>Grupo Megalabs</span><span><i style="background:var(--series-prev)"></i>Competidores</span></div>
         ${hrows(top.map(r=>{ const s=r.v[7]/T[7]*100, g=gr(r.v[7],r.v[6]); return {label:esc(r.b?marca(r.b):r.p),tag:(r.g&&r.b!==x.b?'<span class="g">GRUPO</span>':''),w:s/mxs*100,cls:r===x.row?'b-sel':(r.g?'b-grp':'b-oth'),val:nf1.format(s)+'%',sub:g==null?'nuevo':pct(g),subCls:cls(g),title:(r.c||'')}; }))}
         ${x.riser?`<span class="small">Competidor que más gana: <b style="color:var(--ink)">${esc(x.riser.producto)}</b> (${esc(x.riser.corp)}), ${pp(x.riser.delta_pp)} en el año.</span>`:''}</section>`;
     if(x.mix&&x.mix.length){
       const mxm=Math.max(1,...x.mix.map(m=>Math.max(m.z,m.f)));
-      h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones: zona contra ${esF?'farmacia':'sucursal'}</h2><span class="src">% de la marca en unidades</span></div>
+      h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones: zona contra ${esF?'farmacia':'sucursal'}</h2><span class="src">% de la marca en unidades · CloseUp y ${esF?'Venta Real':'Sell-Out'}</span></div>
         <div class="legend"><span><i style="background:var(--series-zone)"></i>Zona (CloseUp, año móvil)</span><span><i style="background:var(--brand)"></i>${esF?'Farmacia (Venta Real, 12 meses)':'Sucursal (agosto)'}</span></div>
         <div class="hrows">${x.mix.map(m=>`<div class="hrow2"><span class="hl">${esc(P[m.a].n)}</span><div class="pair"><span class="hbar b-zone" style="width:${Math.max(1.5,m.z/mxm*100)}%"></span><span class="hbar b-sel" style="width:${Math.max(1.5,m.f/mxm*100)}%"></span></div><span class="hv num">${nf0.format(m.z)}%<small>${nf0.format(m.f)}%</small></span></div>`).join('')}</div>
         <span class="small">Cuando una presentación pesa mucho más en la zona que en ${esF?'la farmacia':'la sucursal'}, conviene proponerla.</span></section>`;
     }
     const mxc=Math.max(...x.cart.map(c=>c.s),1);
-    h+=`<section class="sec"><div class="sec-h"><h2>Share de ${esc(mb)} en tu cartera</h2><span class="src">${esc(catName(x.cat))} · ${x.cart.length} bricks</span></div>
+    h+=`<section class="sec"><div class="sec-h"><h2>Share de ${esc(mb)} en tu cartera</h2><span class="src">${esc(catName(x.cat))} · ${x.cart.length} bricks · CloseUp, ${perCU()}</span></div>
       <span class="small">Promedio de la cartera: <b style="color:var(--ink)">${nf1.format(x.cartAvg)}%</b>. Este brick está ${x.cartPos}º de ${x.cart.length}.</span>
       ${hrows(x.cart.map(c=>({label:esc(zonaCorta(c.k))+(c.k===String(f.brick)?' <span class="g" style="color:var(--tq-text)">ESTA ZONA</span>':''),w:c.s/mxc*100,cls:c.k===String(f.brick)?'b-sel':'b-oth',val:nf1.format(c.s)+'%',title:'Brick '+c.k})))}</section>`;
   }
@@ -1341,6 +1346,40 @@ document.addEventListener('click',e=>{
   if(e.target.closest('#copiarP')) copiarPedido2();
 });
 
+// ---- v1.22 · Cada dato con su período (o fecha) y su fuente
+const MES3={enero:'ene',febrero:'feb',marzo:'mar',abril:'abr',mayo:'may',junio:'jun',julio:'jul',agosto:'ago',septiembre:'sep',octubre:'oct',noviembre:'nov',diciembre:'dic'};
+const MESN={ene:'enero',feb:'febrero',mar:'marzo',abr:'abril',may:'mayo',jun:'junio',jul:'julio',ago:'agosto',sep:'septiembre',oct:'octubre',nov:'noviembre',dic:'diciembre'};
+const perCU=()=>'año móvil a '+String(D.corte.closeup).replace(/\s*\(MAT\)/,'');
+const perSO=()=>{ const m=String(D.corte.cadenas).match(/^(\w{3})-(\d{2})$/); return m?(MESN[m[1]]||m[1])+' 20'+m[2]:String(D.corte.cadenas); };
+const VR_YTD='ene–ago 2026';
+function perAlerta(a){
+  const d=String(a.detalle||'');
+  if(a.tipo==='caida'||a.tipo==='crece'){ const m=d.match(/^(\p{L}+)–(\p{L}+) (\d{4})/u); return m?`${MES3[m[1].toLowerCase()]||m[1]}–${MES3[m[2].toLowerCase()]||m[2]} ${m[3]} vs. ${m[3]-1}`:VR_YTD+' vs. 2025'; }
+  if(a.tipo==='dejo'){ const m=d.match(/entre (\p{L}+) y (\p{L}+) de (\d{4})/u); return m?`${MES3[m[1]]||m[1]}–${MES3[m[2]]||m[2]} ${+m[3]+1} vs. ${m[3]}`:'últimos meses'; }
+  if(a.tipo==='sin_compra') return 'al '+D.corte.venta_real;
+  if(a.tipo==='share') return perCU()+' vs. año anterior';
+  if(a.tipo==='surtido') return 'zona: '+perCU()+' · farmacia: '+VR_YTD;
+  return perSO();
+}
+function enriquecerFuentes(){
+  (F||[]).forEach(f=>(f.alertas||[]).forEach(a=>{ if(a._src!=null) return; a._src=a.fuente||''; a.per=perAlerta(a);
+    a.fuente = a.tipo==='surtido' ? `CloseUp, ${perCU()} (zona) · Venta Real, ${VR_YTD} (farmacia)` : a._src+', '+a.per; }));
+}
+const srcLbl=s=>String(s||'').split(' · ').map(t=>{ t=t.trim();
+  if(t==='CloseUp') return 'CloseUp, '+perCU();
+  if(t==='Venta Real') return 'Venta Real al '+D.corte.venta_real;
+  if(/^Sell-Out /.test(t)&&!/\d/.test(t)) return t+', '+perSO();
+  return t; }).join(' · ');
+const fechaH=s=>{ const m=String(s||'').match(/^(\d{1,2})\/(\d{2})\/(\d{4})$/); const L=Object.values(MESN); return m?`${+m[1]} de ${L[+m[2]-1]} de ${m[3]}`:s; };
+function fuenteHablada(f){
+  const cu='CloseUp, con el año móvil a '+(MESN[(String(D.corte.closeup).match(/^(\w{3})/)||[])[1]]||'julio')+' de 2026';
+  return esFarmacia(f)? `Fuentes: Venta Real, con datos al ${fechaH(D.corte.venta_real)}, y ${cu}.` : `Fuentes: ventas de la cadena de ${perSO()}, y ${cu}.`;
+}
+(function(){
+  const gF=guionFarmacia; guionFarmacia=f=>{ const S=gF(f); S.push({t:fuenteHablada(f)}); return S; };
+  const gR=guionRuta; guionRuta=()=>{ const S=gR(); S.splice(Math.max(0,S.length-1),0,{t:`Fuentes: Venta Real, con datos al ${fechaH(D.corte.venta_real)}; CloseUp, con el año móvil a julio de 2026; y ventas de las cadenas de ${perSO()}.`}); return S; };
+})();
+
 // ================= Asistente: preguntas habladas o escritas =================
 const ASK={turns:[], busy:false, ctl:null, tools:false, mode:'', clickOnly:false, wasHold:false, discard:false, sr:null, srBlocked:false, recTxt:'', recStart:0, timer:null, holding:false};
 const MIC='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>';
@@ -1411,7 +1450,7 @@ function rulesTurn(){
 Reglas:
 - Español rioplatense, directo y accionable. Máximo 6 líneas o 5 viñetas cortas ("- "). Usá **negrita** solo para lo clave.
 - Usá SOLO los datos de abajo (incluidos los DATOS ADICIONALES, si vienen). Si un dato no está, decilo; no inventes cifras.
-- Cuando des una cifra, nombrá la fuente entre paréntesis: Venta Real (compras de la farmacia a Megalabs, $ netos y unidades, al ${D.corte.venta_real}), CloseUp (mercado por brick: año móvil, último trimestre y mes a jul-26, contra el año anterior) o Sell-Out (ventas de Farmashop y San Roque, ago-26).
+- Cuando des una cifra, aclará SIEMPRE el período o la fecha y la fuente entre paréntesis, por ejemplo (Venta Real, ene–ago 2026), (CloseUp, año móvil a jul-26) o (Sell-Out Farmashop, ago-26). Fuentes: Venta Real (compras de la farmacia a Megalabs, $ netos y unidades, al ${D.corte.venta_real}), CloseUp (mercado por brick: año móvil, último trimestre y mes a jul-26, contra el año anterior) o Sell-Out (ventas de Farmashop y San Roque, ago-26).
 - Celsius, Spefar, Servimedic, Haymann y Dispert son del Grupo Megalabs: no son competencia.
 - Si la pregunta es ambigua, respondé lo más probable y ofrecé en una línea la alternativa.
 Contexto: ${ctx} Hoy es ${hoy()}.
@@ -1693,7 +1732,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.21';
+const APP_VERSION='1.22';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
