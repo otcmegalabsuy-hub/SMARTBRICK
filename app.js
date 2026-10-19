@@ -350,12 +350,7 @@ function zona(f){
       ${c.riser?`<span class="small">Competidor que más gana: <b style="color:var(--ink)">${esc(c.riser.producto)}</b> (${esc(c.riser.corp)}), ${pp(c.riser.delta_pp)} en el año.</span>`:''}
     </div>`; };
   const cz=z.cadenas||{sucursales:[],top:[]};
-  return `<section class="sec"><div class="sec-h"><h2>Brick ${f.brick}</h2><span class="src">CloseUp · MAT a julio 2026</span></div>
-      <span class="small" style="margin-top:-6px">${esc(z.desc)}</span>
-      <div class="kpis">
-        <div class="kpi"><span class="l">Share Megalabs OTC en sus categorías</span><span class="v num">${nf1.format(z.share_meg)}%</span><span class="s num"><span class="${cls(vs)}">${pp(vs)}</span> vs. promedio de tu cartera</span></div>
-        <div class="kpi"><span class="l">Mercado de esas ${cats.length} categorías</span><span class="v num">${moneyC(mk)}</span><span class="s num"><span class="${cls(mkg)}">${pct(mkg)}</span> vs. año anterior</span></div>
-      </div></section>
+  return `${brickCard(Object.assign({brick:f.brick},z),mk,mkg,cats.length)}
     <section class="sec"><div class="sec-h"><h2>Categorías de la zona</h2><span class="src">Mercado $ · crec. vs. año anterior</span></div>
       ${cats.slice(0,6).map(catHTML).join('')}
       ${cats.length>6?`<details><summary>Ver las otras ${cats.length-6} categorías</summary>${cats.slice(6).map(catHTML).join('')}</details>`:''}
@@ -1357,6 +1352,40 @@ document.addEventListener('click',e=>{
   if(e.target.closest('#copiarP')) copiarPedido2();
 });
 
+// ---- v1.27 · Tarjeta del brick en lenguaje simple: primero el tamaño del mercado, después la parte de Megalabs
+function perCU12(){
+  const L=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const m=String(D.corte.closeup).match(/^(\w{3})-(\d{2})/), i=m?L.indexOf(m[1]):-1;
+  if(i<0) return perCU();
+  return L[(i+1)%12]+'-'+String(+m[2]-(i===11?0:1)).padStart(2,'0')+' a '+m[1]+'-'+m[2];
+}
+function brickCard(z,mk,mkg,ncat){
+  const sm=z.share_meg, sc=D.share_cartera, vs=sm-sc, mg=sm*mk/100, mx=Math.max(sm,sc)||1, nz=Object.keys(Z).length;
+  const w=v=>Math.max(2,Math.round(v/mx*100))+'%';
+  const parte = Math.abs(vs)<0.5 ? 'una parte del mercado <b>parecida</b> a la del total de tu cartera'
+              : 'una parte del mercado <b>'+(vs>0?'más grande':'más chica')+'</b> que en el total de tu cartera';
+  const merc = mkg==null ? '' : mkg>=1 ? `, y el mercado <b class="up">creció ${nf0.format(mkg)}%</b> en el último año`
+             : mkg<=-1 ? `, y el mercado <b class="down">bajó ${nf0.format(-mkg)}%</b> en el último año` : ', y el mercado <b>se mantuvo estable</b> en el último año';
+  const dif = Math.abs(vs)<0.05 ? 'Igual que el total de tu cartera'
+            : `<span class="${cls(vs)}">${nf1.format(Math.abs(vs))} ${Math.abs(vs)===1?'punto':'puntos'} ${vs>0?'más':'menos'}</span> que el total de tu cartera (${nz} zonas)`;
+  return `<section class="sec"><div class="sec-h"><h2>Brick ${z.brick||''}</h2><span class="src">CloseUp · ${perCU12()}</span></div>
+      <span class="small" style="margin-top:-6px">${esc(z.desc)}</span>
+      <p class="zsum">En esta zona, Megalabs tiene ${parte}${merc}.</p>
+      <div class="zbox"><span class="l">Cuánto se vendió en la zona</span>
+        <div class="zval"><span class="v num">${moneyC(mk)}</span><span class="u">en 12 meses</span></div>
+        <span class="s">Suma de las ${ncat} categorías donde compite Megalabs OTC (detalle más abajo).</span>
+        ${mkg==null?'':`<span class="s num"><span class="${cls(mkg)}">${pct(mkg)}</span> contra los 12 meses anteriores</span>`}</div>
+      <div class="zbox"><span class="l">Cuánto de eso es de Megalabs</span>
+        <div class="zval"><span class="v num">${nf1.format(sm)}%</span><span class="u">del mercado</span></div>
+        <span class="s">De esos ${moneyC(mk)}, <b>${moneyC(mg)}</b> son de productos Megalabs: $&nbsp;${nf1.format(sm)} de cada $&nbsp;100.</span>
+        <div class="zbars" aria-hidden="true">
+          <div class="zb"><span>Este brick</span><i><b style="width:${w(sm)}"></b></i><span class="num">${nf1.format(sm)}%</span></div>
+          <div class="zb c"><span>Tu cartera</span><i><b style="width:${w(sc)}"></b></i><span class="num">${nf1.format(sc)}%</span></div>
+        </div>
+        <span class="s num">${dif}.</span></div>
+    </section>
+`;
+}
 // ---- v1.22 · Cada dato con su período (o fecha) y su fuente
 const MES3={enero:'ene',febrero:'feb',marzo:'mar',abril:'abr',mayo:'may',junio:'jun',julio:'jul',agosto:'ago',septiembre:'sep',octubre:'oct',noviembre:'nov',diciembre:'dic'};
 const MESN={ene:'enero',feb:'febrero',mar:'marzo',abr:'abril',may:'mayo',jun:'junio',jul:'julio',ago:'agosto',sep:'septiembre',oct:'octubre',nov:'noviembre',dic:'diciembre'};
@@ -1743,7 +1772,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.26';
+const APP_VERSION='1.27';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
