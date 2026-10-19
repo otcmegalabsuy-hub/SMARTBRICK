@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generado": "2026-10-05T16:31Z",
+ "generado": "2026-10-19T19:04Z",
  "usuarios": [
   {
    "nombre": "Andrés Coppola",
@@ -30,32 +30,32 @@
   {
    "nombre": "Pablo Villasante",
    "rol": "vendedor",
-   "salt": "NcVIwLtdVSVbC/JN2cXM3Q==",
+   "salt": "KByhEdb+N74jF1ByYLq3IQ==",
    "iter": 600000,
-   "iv": "QhlJOkDd1rjUeck5",
-   "ct": "AxFPNO+idnv0hCUV2HjO7wdRXqHt0dG/CkUhaF/ffEJ0QnjpEiHOnFd6ckz7d3UY22fii+kh224uieMzZq43RIOQM1hn3E9z7VEAp78Yu1MfutWkttyzTgZhnoag2DdLI3Tj7mBKwKUaA8VsCDsrQFuMIhxgIKqATAEW5yl4E1NPvLiFl0Vy4tUJ6G8yUukRJ2dq4FEeoLPf/QuS/CHdtACNS/66MWMt9pQA64lxfIOkVTb3rUGDKuHm8zI/q/sMqfYJrmCjCE+YoBPZ6ul904uoer7I8cyNS5vWDrhe4uHtY21VeXSnKIJs5E78maQJ7nA9kDJG+QCo"
+   "iv": "rx/ilhXxpRxq+cbT",
+   "ct": "YCrsDCtXCFLuMI28ClG01nmoOGJ70qDRt5W0TYGVg882Tfik+gAqbSATShXXjwd95iTM4y6MU935+fcAeD60f4aWvGvO0iLVvm476GEd2Xysn+F32oYpR4Y5O0hCqYMpqK3VyN8KTPHxfyqVn6R2bCzbmjZtMFnEVQ0371jPwl8U7XHi3uVJppIsocOHBC9r80xMB74Eq5QDlf8DDEsmeLw5gYAYIbe9LxGxykAbYCWcolutyatNVWTe9eEqxS2lY0V/K2NB3NgAFAOnden8LTIFVyzLKIu23kKBht3lpJxkRPbRMsMdL3gI4MgyQpmh+xwxFkQBTdkc"
   },
   {
    "nombre": "Gerencia Comercial",
    "rol": "jefe",
-   "salt": "Vl05aEk3/k0yY+eG1c5xug==",
+   "salt": "Qr/DiBMCJ4jt0kMV8c8ptg==",
    "iter": 600000,
-   "iv": "kb9xpU6eQ1oOHnl3",
-   "ct": "e/U5cOoD0Tc0n0ns5VZ37qwPnVlEN2fReqOGXVv6SvpsMt4Phf+0jO2GxmRegM7rNvI+w9WVpnAxCp1G9X+c2Tkrk7z//Tcucl2riL71DzA8qBanIokklTZeq2qCEveafIcUIPJoRx9x+/XBpkX5KAwPwqYHGwIUapZkOAARVv35e1jzbQM345ftvDF3bLfuFn1ZuB5k+RAuIQGGqF51NCA3ggUzzUDLDbC+AetXmbpu6I3zTtl6eTEsTmnDsH8DjTyu65FZznYX0S59kPAUTmkAyrQLBruZqvkzCOec/gmDQiCkX4vUtaWpkzXOw8tLf+E0m9QvGQ=="
+   "iv": "m823IneQMih3iqYw",
+   "ct": "JLYqeyaHBRSnrzwobRmOWc2eollIRqrEy+b4QkGHQ5G8im7oM6t1c++cyewxg1UNB6QAz+8r5cuMwcYamlyEAFQ/HWbZ+IgAKiRGdKB78HYIxUoRuffMB4+81/X9NIoOq6eLAweZM+CZRXWuGNAU47+N1F/iI9a/PZ3to3l5LATIK1zwMiBLUEsvU+1kE8InvDq7qqBZxX+aXwvN5dxgnuCz3xxdbceG8wky9zKAC5euo+BiwxrU9jYfewGcGZglM78DyyIUgO/+UvFwPY8rvUXODwPjWHp4mUc9yQjU8ZCoXg7bg4ljKwLIHVYPyGm12wL3KLMTXQ=="
   },
   {
    "nombre": "Marketing OTC",
    "rol": "admin",
-   "salt": "0xdCknQHMyMi6J/VaIjP9g==",
+   "salt": "mfrLYv0b7xiEWiES5ryfMA==",
    "iter": 600000,
-   "iv": "Rsiuyo4ZKhoxqL2x",
-   "ct": "56QLdLiDuD9zlL4PiS8loNAPD3ANNd6JIYeqd2280Nf4Q0OXi75biyBbmpzoLK8nKTj5jG5KSOdX/PspVtuhy+11pj62GQk5g9HRNSS8ztl5uVuVH6kgZkB56Aihe/SfzWUz4OfASbhfgkFt2r+HRKe8+WMWfba4dYXV+WjUmZ3cS2z2iWlpRrfb1LsId8KXiZogsJhITiyGPlSEBuWstIznkCvI8O/PL7Dpek0hz4KZZpxVVSJuUOlyQFierQnxDC4d/WS+F4sz6WNKTyZr4IMl7CWrNjJZenJyErqhRSivVHpQv1X0tqMZ9HeHIiIeh/or"
+   "iv": "PAAUEuWto3VIUlED",
+   "ct": "juHbkDPvwPp9B7j0JvW1trrqXmy+UTK6cNSY2T+ok3PRE22HJ98Y+4s9ahAgcUoGPq6LpJ7uCEeUsr9tx8O1dJOwUKHH2kkPfjVH7bN+ezKZ+tr8p8Zpws3mnUfXQzdf4FZy+eJXDJ/JFuSroF7hV4IJU1E5PIe95yteibO852Pr+UQti2sIgA6G5gLSzaDgRyJAHqtiTSKNn/pPIYSKa0PjMBcKa/CCOrCyY4ENwyUZD9ZGJisf5G2BfSqyTctdCzDTfHW+ANKWpKcydo+tuy6v5Q2r2Bgc1DdER029+96U6V87GS5/6cJYPvmMcSnIhgDj"
   }
  ],
  "carteras": {
   "pablo-villasante": {
    "archivo": "data/pablo-villasante.bin",
-   "v": "b82961558b76"
+   "v": "3235f654b4c8"
   }
  }
 }

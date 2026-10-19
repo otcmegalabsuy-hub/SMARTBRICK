@@ -940,7 +940,7 @@ function renderFarmTab(){
   const cp=p.querySelector('#copiar'); if(cp) cp.addEventListener('click',copiarPedido);
   const am=p.querySelector('#analizar'); if(am) am.addEventListener('click',()=>openMarcas());
 }
-const fuentes=()=>`<div class="foot"><span>Fuentes: Venta Real (al ${D.corte.venta_real}) · CloseUp Bricks (${D.corte.closeup}) · Sell-Out Farmashop y San Roque (${D.corte.cadenas})</span><span>Cartera de ${esc(D.vendedor)}${SES&&SES.rol!=='vendedor'?' · vista de '+esc(SES.nombre):''}</span></div>`;
+const fuentes=()=>`<div class="foot"><span>Fuentes: Venta Real (al ${D.corte.venta_real}) · CloseUp Bricks (${D.corte.closeup}) · Sell-Out Farmashop y San Roque (${D.corte.cadenas})${D.stock_mega?' · Stock Mega (al '+esc(D.stock_mega.fecha)+')':''}</span><span>Cartera de ${esc(D.vendedor)}${SES&&SES.rol!=='vendedor'?' · vista de '+esc(SES.nombre):''}</span></div>`;
 function greenPanel(f){
   const A=f.alertas||[], lbl={alta:'Alta',media:'Media',positiva:'Bien'};
   return `<section class="green"><div class="green-h"><h2>Qué mirar antes de entrar</h2>${btnEscuchar('farm:'+f.id)}</div>${A.length?A.map((a,ai)=>`<div class="gitem" data-say="a${ai}"><span class="gpill ${a.nivel}">${lbl[a.nivel]}</span><b>${esc(a.titulo)}</b><p>${esc(a.detalle)} <em>${esc(a.fuente)}</em></p></div>`).join(''):'<p class="gempty">No hay alertas para este punto de venta.</p>'}</section>`;
@@ -1157,6 +1157,20 @@ function marcaScreen(f){
 .qsel input:focus{outline:2px solid var(--brand);outline-offset:-2px}
 .inc-tot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:10px 12px}
 .inc-tot b{font-size:20px}
+/* v1.29 · Stock Mega */
+.sm-res{display:flex;gap:10px;align-items:flex-start;border-radius:9px;padding:10px 12px;font-size:14px;line-height:1.45}
+.sm-res svg{flex-shrink:0;margin-top:1px}
+.sm-res.ok{background:var(--brand-soft);color:#0A5E58}
+.sm-res.warn{background:#FCEFD9;color:#6E4A00}
+.sm-h{margin:6px 0 -4px;font-size:15px}
+.sm-h .small{font-weight:500}
+.ptab.sm td:nth-child(2){white-space:nowrap}
+.ptab.sm th{white-space:nowrap}
+.ptab.sm td:first-child{overflow-wrap:anywhere}
+.ptab.sm td small .chip-s{margin-top:3px}
+.chip-s.nost{background:#FBE3DC;color:#9A2A12}
+.chip-s.low{background:#FAF0D6;color:#7A5300}
+.sm-all summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--tq-text);padding:6px 0}
 `; document.head.appendChild(st); })();
 
 const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -1239,12 +1253,13 @@ function pedidos(f){
   const ok=C.rows.filter(r=>r.estado==='ok'||r.estado==='nuevo');
   const nota=r=> r.estado==='dejo'?'<small>Lo compró en '+(y-1)+' y en '+y+' todavía no</small>'
     : r.estado==='tope'?`<small>Tope: ${PED_TOPE_MESES} meses de su compra habitual · quedan ${n0(r.pend)} para próximas visitas</small>` : '';
+  const notaSM=r=>{ const c=smChip(r.art,r.sug); return c?`<small>${c}</small>`:''; };
   const L=C.rows.filter(r=>r.sug>0);
   return head+`
     <div class="ptot"><span>Pedido: <b class="num">${n0(tSug)}</b> unid. en ${L.length} producto${L.length===1?'':'s'}${val?` <span class="small">≈ ${moneyC(val)}</span>`:''}</span>
       <span class="small num">${per25c}: ${n0(tY25)} unid.${o.k?` → meta ${n0(tMeta)}`:''} · ${per26c}: ${n0(tY26)} · faltan ${n0(tFalta)} en los productos atrasados${tPend?` · ${n0(tPend)} quedan para próximas visitas`:''}</span>${tY26>=tMeta?`<span class="small">En total ya superó la meta; el pedido equilibra los productos que vienen atrasados.</span>`:''}</div>
     ${L.length?`<table class="ptab"><thead><tr><th>Producto</th><th>${per25c}</th><th>${per26c}</th><th>Pedir</th></tr></thead><tbody>
-    ${L.map(r=>`<tr><td>${esc((P[r.art]||{n:r.art}).n)}${nota(r)}</td><td class="num">${n0(r.y25)}</td><td class="num">${n0(r.y26)}</td><td class="num psug">${n0(r.sug)}</td></tr>`).join('')}
+    ${L.map(r=>`<tr><td>${esc((P[r.art]||{n:r.art}).n)}${nota(r)}${notaSM(r)}</td><td class="num">${n0(r.y25)}</td><td class="num">${n0(r.y26)}</td><td class="num psug">${n0(r.sug)}</td></tr>`).join('')}
     </tbody></table>`:`<div class="empty">En todos sus productos ya compró en ${y} lo mismo o más que en ${per25}${o.k?` ${o.l}`:''}: no hace falta equilibrar.</div>`}
     ${ok.length?`<details><summary class="small">${ok.length} producto${ok.length===1?'':'s'} ya ${ok.length===1?'supera':'superan'} lo de ${y-1} (no hace falta pedir para equilibrar)</summary><div class="small" style="padding-top:6px">${ok.map(r=>esc((P[r.art]||{n:r.art}).n)+' ('+n0(r.y26)+' vs. '+n0(r.y25)+')').join(' · ')}</div></details>`:''}
     <span class="small">Cómo se calcula: para cada producto, lo que compró de ${per25}${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, menos lo que ya compró en ${y}. Para no sobrecargar a la farmacia, cada producto tiene un tope de ${PED_TOPE_MESES} meses de su compra habitual (el promedio mensual más alto entre los últimos 12 meses y ${per25}) o lo que compró en ${mN} de ${y-1}, si es mayor. Compras posteriores al ${D.corte.venta_real} todavía no figuran. Valor aproximado con el precio neto de la última compra.</span>
@@ -1253,15 +1268,18 @@ function pedidos(f){
     <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
   </section>`;
 }
+function repCadena(f){
+  return (f.productos||[]).filter(p=>p.u>0&&p.stock!=null&&(p.cob==null||p.cob<2)).map(p=>({...p, rep:Math.max(0,Math.ceil(p.u/4.33*4-(p.stock||0)))})).sort((a,b)=>b.rep-a.rep);
+}
 function pedidoCadena(f){
   const ps=(f.productos||[]).filter(p=>p.u>0||(p.stock!=null&&p.stock>0));
   const conStock=f.tipo==='FARMASHOP';
-  const bajos=conStock? ps.filter(p=>p.u>0&&p.stock!=null&&(p.cob==null||p.cob<2)).map(p=>({...p, rep:Math.max(0,Math.ceil(p.u/4.33*4-(p.stock||0)))})).sort((a,b)=>b.rep-a.rep) : [];
+  const bajos=conStock? repCadena(f) : [];
   const top=[...ps].sort((a,b)=>b.u-a.u).slice(0,8);
   return `<section class="sec"><div class="sec-h"><h2>Pedido</h2><span class="src">Sell-Out ${D.corte.cadenas}</span></div>
     <div class="empty" style="text-align:left">Las sucursales de ${esc(TIPO[f.tipo])} compran por la central de la cadena: no hay compras por sucursal para comparar con el año anterior.</div>
     ${conStock?`<h3 style="margin:4px 0 0;font-size:15px">Para reponer en la sucursal</h3>
-      ${bajos.length?`<table class="ptab"><thead><tr><th>Producto</th><th>Vendió</th><th>Stock</th><th>Reponer</th></tr></thead><tbody>${bajos.map(p=>`<tr><td>${esc(P[p.art].n)}<small>${p.cob==null?'sin stock':'cubre '+nf1.format(p.cob)+' semanas'}</small></td><td class="num">${n0(p.u)}</td><td class="num">${n0(p.stock)}</td><td class="num psug">${n0(p.rep)}</td></tr>`).join('')}</tbody></table>
+      ${bajos.length?`<table class="ptab"><thead><tr><th>Producto</th><th>Vendió</th><th>Stock</th><th>Reponer</th></tr></thead><tbody>${bajos.map(p=>`<tr><td>${esc(P[p.art].n)}<small>${p.cob==null?'sin stock':'cubre '+nf1.format(p.cob)+' semanas'}</small>${smChip(p.art,p.rep)?`<small>${smChip(p.art,p.rep)}</small>`:''}</td><td class="num">${n0(p.u)}</td><td class="num">${n0(p.stock)}</td><td class="num psug">${n0(p.rep)}</td></tr>`).join('')}</tbody></table>
       <span class="small">Productos con menos de 2 semanas de stock según lo que vendió en agosto; la reposición lleva la cobertura a 4 semanas.</span>`:'<div class="empty">Ningún producto tiene menos de 2 semanas de stock.</div>'}`
     :`<h3 style="margin:4px 0 0;font-size:15px">Lo que más vendió en agosto</h3><table class="ptab"><thead><tr><th>Producto</th><th>Unid.</th></tr></thead><tbody>${top.map(p=>`<tr><td>${esc(P[p.art].n)}</td><td class="num">${n0(p.u)}</td></tr>`).join('')}</tbody></table>
       <span class="small">${esc(TIPO[f.tipo])} no informa stock por sucursal.</span>`}
@@ -1276,14 +1294,60 @@ function copiarPedido2(){
   try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
 }
 
-// ---------- Stock Mega (preparado, sin fuente de datos todavía) ----------
+// ---------- Stock Mega (v1.29): stock en los depósitos de Megalabs (dentro de los datos cifrados) ----------
+const SM=()=>D.stock_mega||null;
+const smU=a=>{ const s=SM(); return s&&s.u&&s.u[a]!=null ? s.u[a] : null; };
+// Aviso corto si el producto no tiene stock en Mega o si lo que se quiere pedir supera lo que hay.
+function smChip(a, q){
+  const s=smU(a); if(s==null) return '';
+  if(s<=0) return '<span class="chip-s nost">Sin stock en Mega</span>';
+  if(q&&q>s) return `<span class="chip-s low">No alcanza: Mega tiene ${n0(s)}</span>`;
+  return '';
+}
+function smLinea(a, q){
+  const s=smU(a); if(s==null) return '<span data-incsm="'+a+'"></span>';
+  const c= s<=0 ? '<span class="chip-s nost">Sin stock en Mega</span>' : (q&&q>s ? '<span class="chip-s low">No alcanza</span>' : '');
+  return `<span data-incsm="${a}"> · ${s>0?`En Mega: ${n0(s)} unid.`:''}${c?' '+c:''}</span>`;
+}
 function stockMega(f){
-  const C=esFarmacia(f)&&!f.sin_datos ? calcPedido(f,1) : {rows:[]};
-  const L=C.rows.filter(r=>r.sug>0).slice(0,8);
-  return `<section class="sec"><div class="sec-h"><h2>Stock en el centro logístico</h2><span class="src">Megalabs</span></div>
-    <div class="soon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M8 20v-7h8v7"/><path d="M8 16h8"/></svg>
-      <b>Próximamente</b><span class="small">Cuando se conecte el stock del centro logístico, acá vas a ver si cada producto tiene stock o está en quiebre antes de ofrecerlo, empezando por los del pedido.</span></div>
-    ${L.length?`<table class="ptab"><thead><tr><th>Producto del pedido</th><th>Stock Mega</th></tr></thead><tbody>${L.map(r=>`<tr><td>${esc(P[r.art].n)}</td><td><span class="chip-s">Sin dato</span></td></tr>`).join('')}</tbody></table>`:''}
+  const S=SM();
+  if(!S) return `<section class="sec"><div class="sec-h"><h2>Stock en el centro logístico</h2><span class="src">Megalabs</span></div>
+    <div class="soon"><b>Sin datos de stock</b><span class="small">Todavía no se cargó el stock de los depósitos de Megalabs.</span></div></section>`;
+  const okI='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 12.5l3 3 6-6.5"/></svg>';
+  const wI='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4.5"/><path d="M12 17.4v.1"/></svg>';
+  // 1 · lo que se va a pedir
+  let ped=[], pedT='';
+  if(esFarmacia(f)&&!f.sin_datos){ const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
+    ped=calcPedido(f,o.f).rows.filter(r=>r.sug>0).map(r=>({a:String(r.art),q:r.sug})); pedT=`Productos del pedido <span class="small">(${o.k?'meta '+o.l:'igual a '+(fechaVisita(f).y-1)})</span>`; }
+  else if(f.tipo==='FARMASHOP'){ ped=repCadena(f).filter(p=>p.rep>0).map(p=>({a:String(p.art),q:p.rep})); pedT='Productos para reponer en la sucursal'; }
+  // 2 · productos a incorporar (con la cantidad elegida, si la hay)
+  const C=incCalc(f), Q=INC_Q[f.id]||{};
+  const inc=C?C.L.map(x=>({a:String(x.a),q:Q[x.a]||0})):[];
+  const prob=L=>L.filter(x=>{ const s=smU(x.a); return s!=null&&(s<=0||(x.q>0&&x.q>s)); });
+  const pP=prob(ped), pI=prob(inc.filter(x=>x.q>0)), incSel=inc.filter(x=>x.q>0);
+  const nom=a=>esc((P[a]||{n:a}).n);
+  const celda=x=>{ const s=smU(x.a); if(s==null) return '<span class="chip-s">Sin dato</span>';
+    if(s<=0) return '<span class="chip-s nost">Sin stock</span>';
+    return `<b class="num">${n0(s)}</b>${x.q>s?'<small><span class="chip-s low">No alcanza</span></small>':''}`; };
+  const tabla=(L,col)=>`<table class="ptab sm"><thead><tr><th>Producto</th><th>${col}</th><th>En Mega</th></tr></thead><tbody>${L.map(x=>`<tr><td>${nom(x.a)}</td><td class="num${x.q?' psug':''}">${x.q?n0(x.q):'–'}</td><td class="num">${celda(x)}</td></tr>`).join('')}</tbody></table>`;
+  const pl=(n,s,p)=>n+' '+(n===1?s:p);
+  let res;
+  if(pP.length||pI.length){ const L=[...pP,...pI];
+    res=`<div class="sm-res warn">${wI}<span><b>${pl(L.length,'producto no tiene','productos no tienen')} stock suficiente en Mega:</b> ${L.map(x=>nom(x.a)).join(' · ')}. Conviene ofrecer otra presentación o avisar que la entrega puede demorar.</span></div>`; }
+  else if(ped.length||incSel.length){
+    const fr=(n,s,p)=>n===1?'el '+s:`los ${n} ${p}`;
+    const partes=[ped.length?fr(ped.length,'producto del pedido','productos del pedido'):'', incSel.length?fr(incSel.length,'producto a incorporar que elegiste','productos a incorporar que elegiste'):''].filter(Boolean).join(' y ');
+    res=`<div class="sm-res ok">${okI}<span><b>Hay stock en Mega para ${partes}.</b></span></div>`; }
+  else res=`<div class="sm-res ok">${okI}<span>No hay pedido sugerido para esta visita. Abajo está el stock de los productos a incorporar y de todo el portafolio OTC.</span></div>`;
+  const todos=Object.keys(P).sort((x,y)=>String(P[x].m).localeCompare(String(P[y].m))||P[x].n.localeCompare(P[y].n));
+  const sin=todos.filter(a=>(smU(a)||0)<=0);
+  return `<section class="sec"><div class="sec-h"><h2>Stock en el centro logístico</h2><span class="src">Depósitos Megalabs · al ${esc(S.fecha)}</span></div>
+    ${res}
+    ${ped.length?`<h3 class="sm-h">${pedT}</h3>${tabla(ped,esFarmacia(f)?'Pedir':'Reponer')}`:''}
+    ${inc.length?`<h3 class="sm-h">Productos a Incorporar</h3>${tabla(inc,'Elegido')}`:''}
+    <details class="sm-all"><summary>Stock de todo el portafolio OTC (${todos.length} productos${sin.length?`, ${sin.length} sin stock`:''})</summary>
+      <table class="ptab sm"><thead><tr><th>Producto</th><th>En Mega</th></tr></thead><tbody>${todos.map(a=>`<tr><td>${nom(a)}</td><td class="num">${(smU(a)||0)>0?`<b class="num">${n0(smU(a))}</b>`:'<span class="chip-s nost">Sin stock</span>'}</td></tr>`).join('')}</tbody></table></details>
+    <span class="small">Unidades disponibles en los depósitos de Megalabs al ${esc(S.fecha)}. El stock cambia con los pedidos de cada día: es una referencia para ofrecer, no una reserva.</span>
   </section>`;
 }
 
@@ -1338,10 +1402,10 @@ function rotHTML(L, nota){
 }
 
 // ---------- A incorporar (v1.25): productos de Megalabs que se venden en el brick y esta farmacia no comercializa ----------
-function desvioBrick(f){
+function incCalc(f){
   const cz=f.brick&&D.cuPres?D.cuPres[f.brick]:null;
-  if(!cz) return `<div class="empty">No hay datos de CloseUp para el brick de este punto de venta.</div>`;
-  const esF=esFarmacia(f), per=esF?'al año':'por mes';
+  if(!cz) return null;
+  const esF=esFarmacia(f);
   const arts=Object.keys(cz).filter(a=>P[a]&&cz[a][1]>0), Tz=arts.reduce((s,a)=>s+cz[a][1],0);
   const prod=a=>(f.productos||[]).find(x=>x.art==a)||{};
   const uF=a=>{ const p=prod(a); return esF?(p.u12||0):(p.u||0); };
@@ -1350,6 +1414,12 @@ function desvioBrick(f){
   const L=arts.filter(a=>uF(a)<=0).map(a=>{ const p=prod(a);
     return {a, zu:cz[a][1], z:Tz?cz[a][1]/Tz:0, exp:s?cz[a][1]*s:null, ult:p.ult||null, dias:p.dias, listado:p.listado, stock:p.stock}; })
     .sort((x,y)=>y.zu-x.zu);
+  return {L, esF};
+}
+function desvioBrick(f){
+  const C=incCalc(f);
+  if(!C) return `<div class="empty">No hay datos de CloseUp para el brick de este punto de venta.</div>`;
+  const {L, esF}=C, per=esF?'al año':'por mes';
   const estado=x=> esF ? (x.ult?`Última compra: ${fdate(x.ult)} (hace ${n0(x.dias)} días al ${D.corte.venta_real})`:'Nunca lo compró desde enero de 2025')
     : (x.listado===false?'No está listado en esta sucursal':`Listado sin ventas en ${perSO()}${x.stock!=null?` · stock ${n0(x.stock)}`:''}`);
   INC_ROWS=L.map(x=>x.a);
@@ -1359,7 +1429,7 @@ function desvioBrick(f){
     <span class="small" style="margin-top:-4px">Productos de Megalabs que se venden en el brick ${f.brick} (${esc(zonaCorta(f.brick))}) y que ${esF?`esta farmacia no compró en los últimos 12 meses (Venta Real al ${D.corte.venta_real})`:`esta sucursal no vendió en ${perSO()} (Sell-Out ${esc(TIPO[f.tipo])})`}. Ventas del brick: CloseUp, ${perCU()}. Elegí la cantidad al lado de cada producto que quieras incorporar.</span>
     ${L.length?`<div class="acc">${L.map(x=>`<div class="acc-i${Q[x.a]?' sel':''}" data-inccard="${x.a}"><div class="t tq"><b>${nm(x.a)}</b>${qsel(x.a)}</div>
       <p>Se venden <b>${n0(x.zu)} unid./año</b> en el brick (${nf1.format(x.z*100)}% de las unidades de Megalabs).${x.exp!=null&&x.exp>=1?` Si se vendiera acá como en el brick: ~${n0(x.exp)} unid. ${per}.`:''}</p>
-      <p class="small" style="margin:0">${estado(x)}</p></div>`).join('')}</div>
+      <p class="small" style="margin:0">${estado(x)}${smLinea(x.a,Q[x.a])}</p></div>`).join('')}</div>
     <div class="inc-tot" id="incTot" aria-live="polite">${incTotHTML(f)}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="enviarInc">Enviar pedido</button><span class="small" id="copiadoI" aria-live="polite" style="align-self:center"></span></div>
     <textarea id="pedtxtI" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`
@@ -1381,7 +1451,8 @@ function setIncQ(a, q){
   const card=document.querySelector(`[data-inccard="${a}"]`);
   if(card){ card.classList.toggle('sel', q>0);
     const i=card.querySelector('[data-inci]'); if(i&&document.activeElement!==i) i.value=q||'';
-    const m=card.querySelector('[data-d="-1"]'); if(m) m.disabled=!q; }
+    const m=card.querySelector('[data-d="-1"]'); if(m) m.disabled=!q;
+    const s=card.querySelector('[data-incsm]'); if(s) s.outerHTML=smLinea(a,q); }
   const t=$('#incTot'); if(t) t.innerHTML=incTotHTML(f);
   const c=$('#copiadoI'); if(c) c.textContent='';
 }
@@ -1822,7 +1893,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.28';
+const APP_VERSION='1.29';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
