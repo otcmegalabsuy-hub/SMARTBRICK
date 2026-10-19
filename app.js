@@ -1107,17 +1107,18 @@ function marcaScreen(f){
 /* v1.16: sin el buscador de farmacias (se elige en la lista) */
 .cfg label[for="cBuscar"]{display:none!important}
 #tabs.tabs{display:flex;flex-direction:column;gap:8px;background:none;border:0;padding:0}
-/* v1.20 · CHECKEAR / ACCIONAR como encabezado del que se despliegan las pestañas */
-#tabs.tabs{gap:12px}
+/* v1.21 · CHECKEAR / ACCIONAR: barra de encabezado y fila de pestañas con la punta sobre la elegida */
+#tabs.tabs{gap:14px}
 .tgrp{display:flex;flex-direction:column;gap:0}
-.tlab{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;font-size:13px;font-weight:800;letter-spacing:.09em;color:var(--tq-text);padding:0 0 7px 2px;text-shadow:0 0 3px #fff,0 0 8px #fff}
-.tlab .ti{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;flex-shrink:0}
-.tlab .tv{color:var(--tq-text);margin-left:-2px}
-.trow{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;background:var(--surface);border:1.5px solid var(--brand);border-radius:10px;padding:5px;box-shadow:0 2px 8px rgba(20,30,26,.06)}
-.trow::before,.trow::after{content:'';position:absolute;left:11px;border:8px solid transparent;border-top:0}
+.tlab{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:38px;border-radius:8px;background:#A6DCD7;border:1.5px solid #7CC9C2;font-size:13.5px;font-weight:800;letter-spacing:.13em;color:var(--tq-text);padding:0 10px;margin-bottom:10px}
+.tlab .ti{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--tq-text);color:#fff;flex-shrink:0}
+.tlab .tv{color:var(--tq-text);margin-left:-3px}
+.trow{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;background:var(--surface);border:1.5px solid var(--brand);border-radius:10px;padding:6px;box-shadow:0 2px 8px rgba(20,30,26,.06);--cx:11px}
+.trow::before,.trow::after{content:'';position:absolute;left:var(--cx);border:8px solid transparent;border-top:0;transition:left .2s ease}
 .trow::before{top:-8px;border-bottom-color:var(--brand)}
 .trow::after{top:-6px;border-bottom-color:var(--surface)}
-.tgrp .tab{min-height:44px;border-radius:7px;background:#E7EBEC;font-size:12.5px;font-weight:500;line-height:1.15;padding:2px 3px;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.trow::before,.trow::after{transition:none}}
+.tgrp .tab{min-height:44px;border-radius:7px;background:#E7EBEC;font-size:12.5px;font-weight:600;line-height:1.15;padding:2px 3px;color:var(--ink)}
 .tgrp .tab[aria-selected="true"]{background:var(--brand-soft);box-shadow:inset 0 0 0 2px var(--brand);color:var(--tq-text);font-weight:700}
 .opt3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .opt3 button{min-height:52px;border:1.5px solid var(--line);border-radius:9px;background:var(--surface);font-size:13px;line-height:1.2;padding:4px 6px;color:var(--ink)}
@@ -1154,9 +1155,19 @@ function tabsHTML(f){
   const ICK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   const IAC='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.6z"/></svg>';
   const IV='<svg class="tv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  requestAnimationFrame(posCaret);
   return `<div class="tgrp"><span class="tlab" id="tl-chk"><span class="ti">${ICK}</span>CHECKEAR${IV}</span><div class="trow" role="tablist" aria-labelledby="tl-chk">${TABS_INFO(f).map(b).join('')}</div></div>
     <div class="tgrp"><span class="tlab" id="tl-acc"><span class="ti">${IAC}</span>ACCIONAR${IV}</span><div class="trow" role="tablist" aria-labelledby="tl-acc">${TABS_ACC.map(b).join('')}</div></div>`;
 }
+// La punta del globo se ubica sobre la pestaña elegida de cada fila (si no hay ninguna, queda a la izquierda).
+function posCaret(){
+  document.querySelectorAll('#tabs .trow').forEach(r=>{
+    const t=r.querySelector('.tab[aria-selected="true"]');
+    r.style.setProperty('--cx', (t&&t.offsetWidth ? Math.round(t.offsetLeft+t.offsetWidth/2-8) : 11)+'px');
+  });
+}
+document.addEventListener('click',e=>{ if(e.target.closest('#tabs .tab')) requestAnimationFrame(posCaret); });
+window.addEventListener('resize',()=>requestAnimationFrame(posCaret));
 // Fecha de la visita: la de la ruta si la ficha se abrió desde una ruta; si no, hoy.
 function fechaVisita(f){
   const iso = (typeof RUTA_NAV!=='undefined' && RUTA_NAV && RUTA_NAV.ids && RUTA_NAV.ids.includes(f.id)) ? RUTA_NAV.fecha : (()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
@@ -1682,7 +1693,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.20';
+const APP_VERSION='1.21';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
