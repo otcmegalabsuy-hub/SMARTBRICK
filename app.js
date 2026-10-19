@@ -1144,11 +1144,24 @@ function marcaScreen(f){
 .soon{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:18px 10px;border:1.5px dashed var(--line);border-radius:12px;background:var(--surface)}
 .soon svg{color:var(--tq-text)}
 .soon b{font-size:17px}
+/* v1.28 · Productos a Incorporar: cantidad por producto y Enviar pedido */
+.acc-i .t.tq{align-items:center}
+.acc-i .t.tq b{flex:1;min-width:0}
+.acc-i.sel{border-color:var(--brand);background:var(--brand-soft)}
+.qsel{display:inline-flex;align-items:stretch;flex-shrink:0;height:40px;border:1.5px solid var(--brand);border-radius:9px;overflow:hidden;background:var(--surface)}
+.qsel button{width:38px;border:0;background:var(--brand-soft);color:var(--tq-text);font-size:21px;font-weight:700;line-height:1;padding:0;cursor:pointer}
+.qsel button:active{background:#C9ECE8}
+.qsel button:disabled{color:#A9B3B0;cursor:default}
+.qsel input{width:52px;border:0;border-left:1px solid #CFE7E4;border-right:1px solid #CFE7E4;text-align:center;font:inherit;font-size:16px;font-weight:700;color:var(--ink);padding:0;background:var(--surface);-moz-appearance:textfield;appearance:textfield}
+.qsel input::-webkit-outer-spin-button,.qsel input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.qsel input:focus{outline:2px solid var(--brand);outline-offset:-2px}
+.inc-tot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:10px 12px}
+.inc-tot b{font-size:20px}
 `; document.head.appendChild(st); })();
 
 const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const TABS_INFO=f=>[['resumen','Resumen'],[esFarmacia(f)?'compras':'ventas',esFarmacia(f)?'Compras':'Ventas'],['zona','Zona'],['marca','Marcas']];
-const TABS_ACC=[['pedidos','Pedidos'],['stock','Stock<br>Mega'],['rotacion','Baja<br>Rotación'],['desvio','A incorporar']];
+const TABS_ACC=[['pedidos','Pedidos'],['stock','Stock<br>Mega'],['rotacion','Baja<br>Rotación'],['desvio','Productos a<br>Incorporar']];
 function tabsHTML(f){
   const b=([k,l])=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${k===curTab}">${l}</button>`;
   const ICK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -1235,7 +1248,7 @@ function pedidos(f){
     </tbody></table>`:`<div class="empty">En todos sus productos ya compró en ${y} lo mismo o más que en ${per25}${o.k?` ${o.l}`:''}: no hace falta equilibrar.</div>`}
     ${ok.length?`<details><summary class="small">${ok.length} producto${ok.length===1?'':'s'} ya ${ok.length===1?'supera':'superan'} lo de ${y-1} (no hace falta pedir para equilibrar)</summary><div class="small" style="padding-top:6px">${ok.map(r=>esc((P[r.art]||{n:r.art}).n)+' ('+n0(r.y26)+' vs. '+n0(r.y25)+')').join(' · ')}</div></details>`:''}
     <span class="small">Cómo se calcula: para cada producto, lo que compró de ${per25}${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, menos lo que ya compró en ${y}. Para no sobrecargar a la farmacia, cada producto tiene un tope de ${PED_TOPE_MESES} meses de su compra habitual (el promedio mensual más alto entre los últimos 12 meses y ${per25}) o lo que compró en ${mN} de ${y-1}, si es mayor. Compras posteriores al ${D.corte.venta_real} todavía no figuran. Valor aproximado con el precio neto de la última compra.</span>
-    ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver A incorporar</button>.</span>`:''}
+    ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Productos a Incorporar</button>.</span>`:''}
     ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">Enviar pedido</button><span class="small" id="copiado" aria-live="polite" style="align-self:center"></span></div>
     <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
   </section>`;
@@ -1339,18 +1352,55 @@ function desvioBrick(f){
     .sort((x,y)=>y.zu-x.zu);
   const estado=x=> esF ? (x.ult?`Última compra: ${fdate(x.ult)} (hace ${n0(x.dias)} días al ${D.corte.venta_real})`:'Nunca lo compró desde enero de 2025')
     : (x.listado===false?'No está listado en esta sucursal':`Listado sin ventas en ${perSO()}${x.stock!=null?` · stock ${n0(x.stock)}`:''}`);
-  return `<section class="sec"><div class="sec-h"><h2>A incorporar</h2><span class="src">${L.length} producto${L.length===1?'':'s'}</span></div>
-    <span class="small" style="margin-top:-4px">Productos de Megalabs que se venden en el brick ${f.brick} (${esc(zonaCorta(f.brick))}) y que ${esF?`esta farmacia no compró en los últimos 12 meses (Venta Real al ${D.corte.venta_real})`:`esta sucursal no vendió en ${perSO()} (Sell-Out ${esc(TIPO[f.tipo])})`}. Ventas del brick: CloseUp, ${perCU()}.</span>
-    ${L.length?`<div class="acc">${L.map(x=>`<div class="acc-i"><div class="t"><b>${esc(P[x.a].n)}</b><span class="num">${n0(x.zu)} unid./año en el brick</span></div>
-      <p>Es el ${nf1.format(x.z*100)}% de las unidades de Megalabs en el brick.${x.exp!=null&&x.exp>=1?` Si se vendiera acá como en el brick: ~${n0(x.exp)} unid. ${per}.`:''}</p>
-      <p class="small" style="margin:0">${estado(x)}</p></div>`).join('')}</div>`
+  INC_ROWS=L.map(x=>x.a);
+  const Q=incQ(f), nm=a=>esc(P[a].n);
+  const qsel=a=>{ const q=Q[a]||0; return `<span class="qsel" role="group" aria-label="Cantidad de ${nm(a)}"><button type="button" data-incq="${a}" data-d="-1" aria-label="Restar una unidad de ${nm(a)}"${q?'':' disabled'}>−</button><input type="number" inputmode="numeric" min="0" max="9999" step="1" value="${q||''}" placeholder="0" data-inci="${a}" aria-label="Unidades de ${nm(a)}"><button type="button" data-incq="${a}" data-d="1" aria-label="Sumar una unidad de ${nm(a)}">+</button></span>`; };
+  return `<section class="sec"><div class="sec-h"><h2>Productos a Incorporar</h2><span class="src">${L.length} producto${L.length===1?'':'s'}</span></div>
+    <span class="small" style="margin-top:-4px">Productos de Megalabs que se venden en el brick ${f.brick} (${esc(zonaCorta(f.brick))}) y que ${esF?`esta farmacia no compró en los últimos 12 meses (Venta Real al ${D.corte.venta_real})`:`esta sucursal no vendió en ${perSO()} (Sell-Out ${esc(TIPO[f.tipo])})`}. Ventas del brick: CloseUp, ${perCU()}. Elegí la cantidad al lado de cada producto que quieras incorporar.</span>
+    ${L.length?`<div class="acc">${L.map(x=>`<div class="acc-i${Q[x.a]?' sel':''}" data-inccard="${x.a}"><div class="t tq"><b>${nm(x.a)}</b>${qsel(x.a)}</div>
+      <p>Se venden <b>${n0(x.zu)} unid./año</b> en el brick (${nf1.format(x.z*100)}% de las unidades de Megalabs).${x.exp!=null&&x.exp>=1?` Si se vendiera acá como en el brick: ~${n0(x.exp)} unid. ${per}.`:''}</p>
+      <p class="small" style="margin:0">${estado(x)}</p></div>`).join('')}</div>
+    <div class="inc-tot" id="incTot" aria-live="polite">${incTotHTML(f)}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="enviarInc">Enviar pedido</button><span class="small" id="copiadoI" aria-live="polite" style="align-self:center"></span></div>
+    <textarea id="pedtxtI" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`
       :`<div class="empty">${esF?'Esta farmacia ya compra':'Esta sucursal ya vende'} todos los productos de Megalabs que se venden en su brick.</div>`}
   </section>`;
+}
+// Cantidades elegidas en Productos a Incorporar: por punto de venta, mientras dure la sesión de la app.
+const INC_Q={}; let INC_ROWS=[];
+const incQ=f=>INC_Q[f.id]||(INC_Q[f.id]={});
+function incSel(f){ const Q=incQ(f); return INC_ROWS.filter(a=>Q[a]>0).map(a=>({a, q:Q[a]})); }
+function incTotHTML(f){
+  const S=incSel(f), t=S.reduce((s,x)=>s+x.q,0);
+  return S.length ? `<span>Pedido: <b class="num">${n0(t)}</b> unid. en ${S.length} producto${S.length===1?'':'s'}</span>`
+    : `<span class="small">Todavía no elegiste cantidades. Usá <b>+</b> o escribí el número al lado de cada producto.</span>`;
+}
+function setIncQ(a, q){
+  const f=cur, Q=incQ(f); q=Math.max(0,Math.min(9999,Math.round(+q||0)));
+  if(q) Q[a]=q; else delete Q[a];
+  const card=document.querySelector(`[data-inccard="${a}"]`);
+  if(card){ card.classList.toggle('sel', q>0);
+    const i=card.querySelector('[data-inci]'); if(i&&document.activeElement!==i) i.value=q||'';
+    const m=card.querySelector('[data-d="-1"]'); if(m) m.disabled=!q; }
+  const t=$('#incTot'); if(t) t.innerHTML=incTotHTML(f);
+  const c=$('#copiadoI'); if(c) c.textContent='';
+}
+function enviarInc(){
+  const f=cur, S=incSel(f);
+  if(!S.length){ $('#copiadoI').textContent='Elegí la cantidad de al menos un producto.'; return; }
+  const txt=f.nombre+' — productos a incorporar\n'+S.map(x=>'• '+P[x.a].n+' — '+x.q+' unid.').join('\n')+'\nTotal: '+S.reduce((s,x)=>s+x.q,0)+' unid. en '+S.length+' producto'+(S.length===1?'':'s');
+  const ok=()=>{ $('#copiadoI').textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
+  const fallback=()=>{ const t=$('#pedtxtI'); t.hidden=false; t.value=txt; t.focus(); t.select(); $('#copiadoI').textContent='Seleccioná el texto y copialo.'; };
+  try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
 }
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-pedopt]'); if(b){ pedOpt=+b.dataset.pedopt; store.set('pedopt',pedOpt); renderFarmTab(); return; }
   if(e.target.closest('#copiarP')) copiarPedido2();
+  const q=e.target.closest('[data-incq]'); if(q){ const a=q.dataset.incq; setIncQ(a, (incQ(cur)[a]||0)+(+q.dataset.d)); return; }
+  if(e.target.closest('#enviarInc')) enviarInc();
 });
+document.addEventListener('input',e=>{ const i=e.target.closest&&e.target.closest('[data-inci]'); if(i) setIncQ(i.dataset.inci, i.value); });
+document.addEventListener('change',e=>{ const i=e.target.closest&&e.target.closest('[data-inci]'); if(i) i.value=incQ(cur)[i.dataset.inci]||''; });
 
 // ---- v1.27 · Tarjeta del brick en lenguaje simple: primero el tamaño del mercado, después la parte de Megalabs
 function perCU12(){
@@ -1772,7 +1822,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.27';
+const APP_VERSION='1.28';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
