@@ -921,7 +921,7 @@ function renderFarm(){
   const f=cur; if(!f) return;
   $('#pcard').innerHTML=`<span class="ptag">${TIPO[f.tipo]}${f.suc?' · sucursal '+f.suc:''}</span><h1>${esc(f.nombre)}</h1>
     <p>${f.brick?'Brick '+f.brick+' · '+esc(zonaCorta(f.brick)):'Sin brick asignado'}</p>
-    <p>${f.zona_erp?'Zona ERP: '+esc(f.zona_erp)+' · ':''}${esc(f.depto||zonaDepto(f.brick))}${f.ruta?' · '+esc(f.ruta):''}</p>`;
+    <p>${f.zona_erp?'Zona Comercial: '+esc(f.zona_erp.replace(/^Zona\s+/i,''))+' · ':''}${esc(f.depto||zonaDepto(f.brick))}${f.ruta?' · '+esc(f.ruta):''}</p>`;
   const esF=esFarmacia(f);
   $('#tabs').innerHTML=tabsHTML(f);
   renderFarmTab(); renderRutaBar();
@@ -1102,13 +1102,21 @@ function marcaScreen(f){
 
 
 
-// ---- v1.14 · Ficha en dos grupos: Información (lo que pasó) y Acciones (qué hacer)
+// ---- v1.14 · Ficha en dos grupos: CHECKEAR (lo que pasó) y ACCIONAR (qué hacer)
 (function(){ const st=document.createElement('style'); st.textContent=`
 /* v1.16: sin el buscador de farmacias (se elige en la lista) */
 .cfg label[for="cBuscar"]{display:none!important}
 #tabs.tabs{display:flex;flex-direction:column;gap:8px;background:none;border:0;padding:0}
-.tgrp{display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr));gap:5px;background:var(--surface);border:1.5px solid var(--edge);border-radius:10px;padding:5px;align-items:stretch}
-.tlab{display:grid;place-items:center;padding:0 9px;border-radius:7px;background:var(--brand);color:#fff;font-size:13px;font-weight:700;letter-spacing:.01em}
+/* v1.20 · CHECKEAR / ACCIONAR como encabezado del que se despliegan las pestañas */
+#tabs.tabs{gap:12px}
+.tgrp{display:flex;flex-direction:column;gap:0}
+.tlab{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;font-size:13px;font-weight:800;letter-spacing:.09em;color:var(--tq-text);padding:0 0 7px 2px;text-shadow:0 0 3px #fff,0 0 8px #fff}
+.tlab .ti{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;flex-shrink:0}
+.tlab .tv{color:var(--tq-text);margin-left:-2px}
+.trow{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;background:var(--surface);border:1.5px solid var(--brand);border-radius:10px;padding:5px;box-shadow:0 2px 8px rgba(20,30,26,.06)}
+.trow::before,.trow::after{content:'';position:absolute;left:11px;border:8px solid transparent;border-top:0}
+.trow::before{top:-8px;border-bottom-color:var(--brand)}
+.trow::after{top:-6px;border-bottom-color:var(--surface)}
 .tgrp .tab{min-height:44px;border-radius:7px;background:#E7EBEC;font-size:12.5px;font-weight:500;line-height:1.15;padding:2px 3px;color:var(--ink)}
 .tgrp .tab[aria-selected="true"]{background:var(--brand-soft);box-shadow:inset 0 0 0 2px var(--brand);color:var(--tq-text);font-weight:700}
 .opt3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
@@ -1143,8 +1151,11 @@ const TABS_INFO=f=>[['resumen','Resumen'],[esFarmacia(f)?'compras':'ventas',esFa
 const TABS_ACC=[['pedidos','Pedidos'],['stock','Stock<br>Mega'],['rotacion','Baja<br>Rotación'],['desvio','Desvío<br>vs Brick']];
 function tabsHTML(f){
   const b=([k,l])=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${k===curTab}">${l}</button>`;
-  return `<div class="tgrp" role="tablist" aria-label="Información"><span class="tlab">Información</span>${TABS_INFO(f).map(b).join('')}</div>
-    <div class="tgrp" role="tablist" aria-label="Acciones"><span class="tlab">Acciones</span>${TABS_ACC.map(b).join('')}</div>`;
+  const ICK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const IAC='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9.5 22 20 9.5h-6.6z"/></svg>';
+  const IV='<svg class="tv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  return `<div class="tgrp"><span class="tlab" id="tl-chk"><span class="ti">${ICK}</span>CHECKEAR${IV}</span><div class="trow" role="tablist" aria-labelledby="tl-chk">${TABS_INFO(f).map(b).join('')}</div></div>
+    <div class="tgrp"><span class="tlab" id="tl-acc"><span class="ti">${IAC}</span>ACCIONAR${IV}</span><div class="trow" role="tablist" aria-labelledby="tl-acc">${TABS_ACC.map(b).join('')}</div></div>`;
 }
 // Fecha de la visita: la de la ruta si la ficha se abrió desde una ruta; si no, hoy.
 function fechaVisita(f){
@@ -1671,7 +1682,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.18';
+const APP_VERSION='1.20';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
