@@ -1104,6 +1104,8 @@ function marcaScreen(f){
 
 // ---- v1.14 · Ficha en dos grupos: Información (lo que pasó) y Acciones (qué hacer)
 (function(){ const st=document.createElement('style'); st.textContent=`
+/* v1.16: sin el buscador de farmacias (se elige en la lista) */
+.cfg label[for="cBuscar"]{display:none!important}
 #tabs.tabs{display:flex;flex-direction:column;gap:8px;background:none;border:0;padding:0}
 .tgrp{display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr));gap:5px;background:var(--surface);border:1.5px solid var(--edge);border-radius:10px;padding:5px;align-items:stretch}
 .tlab{display:grid;place-items:center;padding:0 9px;border-radius:7px;background:var(--brand);color:#fff;font-size:13px;font-weight:700;letter-spacing:.01em}
@@ -1137,7 +1139,7 @@ function marcaScreen(f){
 `; document.head.appendChild(st); })();
 
 const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-const TABS_INFO=f=>[['resumen','Resumen'],[esFarmacia(f)?'compras':'ventas',esFarmacia(f)?'Compras':'Ventas'],['marca','Marcas'],['zona','Zona']];
+const TABS_INFO=f=>[['resumen','Resumen'],[esFarmacia(f)?'compras':'ventas',esFarmacia(f)?'Compras':'Ventas'],['zona','Zona'],['marca','Marcas']];
 const TABS_ACC=[['pedidos','Pedidos'],['stock','Stock<br>Mega'],['rotacion','Baja<br>Rotación'],['desvio','Desvío<br>vs Brick']];
 function tabsHTML(f){
   const b=([k,l])=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${k===curTab}">${l}</button>`;
@@ -1669,7 +1671,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.15';
+const APP_VERSION='1.17';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
