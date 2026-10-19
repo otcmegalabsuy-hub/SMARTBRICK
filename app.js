@@ -1170,6 +1170,13 @@ function marcaScreen(f){
 .ptab.sm td small .chip-s{margin-top:3px}
 .chip-s.nost{background:#FBE3DC;color:#9A2A12}
 .chip-s.low{background:#FAF0D6;color:#7A5300}
+.qsel.qw input{width:66px}
+.nw{white-space:nowrap}
+.pedc .pmeta{font-size:13px;color:#2B302E;margin:0}
+.pedc .pnote{margin:0}
+.pedc.cero{background:#F6F7F7}
+.pedc.cero .t b{color:var(--muted)}
+.chip-s.pmod{background:var(--brand-soft);color:var(--tq-text)}
 .sm-all summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--tq-text);padding:6px 0}
 `; document.head.appendChild(st); })();
 
@@ -1242,25 +1249,25 @@ function pedidos(f){
   PED_ROWS=C.rows.filter(r=>r.sug>0);
   const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.k?x.l:'Igual a '+(y-1)}</b>acumulado ${per25c}</button>`).join('');
   const inc=(f.pedido||[]).filter(q=>q.tipo==='incorporar').length;
-  const head=`<section class="sec"><div class="sec-h"><h2>Pedido para equilibrar el año</h2><span class="src">Venta Real · unidades</span></div>
-    <span class="small" style="margin-top:-4px">Visita de ${mN} ${y}. Meta: lo que compró de ${per25}${o.k?` más un ${o.k}%`:''}. Se descuenta lo que ya compró en ${y} (Venta Real al ${D.corte.venta_real}).</span>
+  const head=`<section class="sec"><div class="sec-h"><h2>Realizar pedido</h2><span class="src">Venta Real · unidades</span></div>
+    <span class="small" style="margin-top:-4px">Visita de ${mN} ${y}. Meta: lo que compró de ${per25}${o.k?` más un ${o.k}%`:''}. Se descuenta lo que ya compró en ${y} (Venta Real al ${D.corte.venta_real}). Las cantidades vienen precargadas según la meta elegida: podés cambiarlas con − y + o escribiendo el número.</span>
     <div class="opt3" role="group" aria-label="Meta del pedido">${btns}</div>`;
   if(!C.i25.length) return head+`<div class="empty">No hay datos de ${per25} para comparar.</div></section>`;
   if(!C.rows.length) return head+`<div class="empty">No compró productos OTC de Megalabs ni en ${per25} ni en ${y}.</div></section>`;
   const T=k=>C.rows.reduce((s,r)=>s+r[k],0);
   const tY25=T('y25'), tMeta=T('meta'), tY26=T('y26'), tFalta=T('falta'), tSug=T('sug'), tPend=T('pend');
-  const val=PED_ROWS.reduce((s,r)=>s+(r.precio?r.precio*r.sug:0),0);
   const ok=C.rows.filter(r=>r.estado==='ok'||r.estado==='nuevo');
   const nota=r=> r.estado==='dejo'?'<small>Lo compró en '+(y-1)+' y en '+y+' todavía no</small>'
     : r.estado==='tope'?`<small>Tope: ${PED_TOPE_MESES} meses de su compra habitual · quedan ${n0(r.pend)} para próximas visitas</small>` : '';
-  const notaSM=r=>{ const c=smChip(r.art,r.sug); return c?`<small>${c}</small>`:''; };
   const L=C.rows.filter(r=>r.sug>0);
   return head+`
-    <div class="ptot"><span>Pedido: <b class="num">${n0(tSug)}</b> unid. en ${L.length} producto${L.length===1?'':'s'}${val?` <span class="small">≈ ${moneyC(val)}</span>`:''}</span>
+    <div class="ptot"><span id="pedTot">${pedTotHTML(f,o)}</span>
       <span class="small num">${per25c}: ${n0(tY25)} unid.${o.k?` → meta ${n0(tMeta)}`:''} · ${per26c}: ${n0(tY26)} · faltan ${n0(tFalta)} en los productos atrasados${tPend?` · ${n0(tPend)} quedan para próximas visitas`:''}</span>${tY26>=tMeta?`<span class="small">En total ya superó la meta; el pedido equilibra los productos que vienen atrasados.</span>`:''}</div>
-    ${L.length?`<table class="ptab"><thead><tr><th>Producto</th><th>${per25c}</th><th>${per26c}</th><th>Pedir</th></tr></thead><tbody>
-    ${L.map(r=>`<tr><td>${esc((P[r.art]||{n:r.art}).n)}${nota(r)}${notaSM(r)}</td><td class="num">${n0(r.y25)}</td><td class="num">${n0(r.y26)}</td><td class="num psug">${n0(r.sug)}</td></tr>`).join('')}
-    </tbody></table>`:`<div class="empty">En todos sus productos ya compró en ${y} lo mismo o más que en ${per25}${o.k?` ${o.l}`:''}: no hace falta equilibrar.</div>`}
+    ${L.length?`<div class="acc">${L.map(r=>{ const q=pedQ(f,o,r), nm=esc((P[r.art]||{n:r.art}).n);
+      return `<div class="acc-i pedc${q?'':' cero'}" data-pedcard="${r.art}"><div class="t tq"><b>${nm}</b>${qselPed(r.art,q,nm)}</div>
+        <p class="pmeta num"><span class="nw">${per25c}: <b>${n0(r.y25)}</b></span> · <span class="nw">${per26c}: <b>${n0(r.y26)}</b></span> · <span class="nw">sugerido: <b>${n0(r.sug)}</b></span></p>
+        <p class="small pnote">${nota(r).replace(/<\/?small>/g,'')} <span data-pedx="${r.art}">${pedExtra(r.art,q,r.sug)}</span></p></div>`; }).join('')}</div>
+    <button class="back" id="pedReset" style="min-height:32px;padding:0;align-self:flex-start"${pedEdit(f,o)?'':' hidden'}>Volver a las cantidades sugeridas</button>`:`<div class="empty">En todos sus productos ya compró en ${y} lo mismo o más que en ${per25}${o.k?` ${o.l}`:''}: no hace falta equilibrar.</div>`}
     ${ok.length?`<details><summary class="small">${ok.length} producto${ok.length===1?'':'s'} ya ${ok.length===1?'supera':'superan'} lo de ${y-1} (no hace falta pedir para equilibrar)</summary><div class="small" style="padding-top:6px">${ok.map(r=>esc((P[r.art]||{n:r.art}).n)+' ('+n0(r.y26)+' vs. '+n0(r.y25)+')').join(' · ')}</div></details>`:''}
     <span class="small">Cómo se calcula: para cada producto, lo que compró de ${per25}${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, menos lo que ya compró en ${y}. Para no sobrecargar a la farmacia, cada producto tiene un tope de ${PED_TOPE_MESES} meses de su compra habitual (el promedio mensual más alto entre los últimos 12 meses y ${per25}) o lo que compró en ${mN} de ${y-1}, si es mayor. Compras posteriores al ${D.corte.venta_real} todavía no figuran. Valor aproximado con el precio neto de la última compra.</span>
     ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Productos a Incorporar</button>.</span>`:''}
@@ -1285,10 +1292,41 @@ function pedidoCadena(f){
       <span class="small">${esc(TIPO[f.tipo])} no informa stock por sucursal.</span>`}
   </section>`;
 }
+// v1.31 · Cantidades del pedido editables: vienen precargadas con lo sugerido para la meta elegida (igual, +2% o +4%).
+// Los cambios se guardan por punto de venta y por meta mientras la app esté abierta.
+const PED_Q={};
+const pedKey=(f,o)=>f.id+'|'+o.k;
+const pedQ=(f,o,r)=>{ const m=PED_Q[pedKey(f,o)]; return m&&m[r.art]!=null?m[r.art]:r.sug; };
+const pedEdit=(f,o)=>{ const m=PED_Q[pedKey(f,o)]; return !!m&&Object.keys(m).length>0; };
+const pedOptAct=()=>PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
+function qselPed(a,q,nm){ return `<span class="qsel qw" role="group" aria-label="Cantidad de ${nm}"><button type="button" data-pedq="${a}" data-d="-1" aria-label="Restar una unidad de ${nm}"${q?'':' disabled'}>−</button><input type="number" inputmode="numeric" min="0" max="999999" step="1" value="${q}" data-pedi="${a}" aria-label="Unidades de ${nm}"><button type="button" data-pedq="${a}" data-d="1" aria-label="Sumar una unidad de ${nm}">+</button></span>`; }
+function pedExtra(a,q,sug){
+  const c=smChip(a,q), m=q!==sug?(q?'<span class="chip-s pmod">Modificado</span>':'<span class="chip-s">No se pide</span>'):'';
+  return (m||c)?`${m}${m&&c?' ':''}${c}`:'';
+}
+function pedTotHTML(f,o){
+  const S=PED_ROWS.map(r=>({r, q:pedQ(f,o,r)})).filter(x=>x.q>0), t=S.reduce((s,x)=>s+x.q,0), val=S.reduce((s,x)=>s+(x.r.precio?x.r.precio*x.q:0),0);
+  return `Pedido: <b class="num">${n0(t)}</b> unid. en ${S.length} producto${S.length===1?'':'s'}${val?` <span class="small nw">≈ ${moneyC(val)}</span>`:''}`;
+}
+function setPedQ(a,q){
+  const f=cur, o=pedOptAct(), r=PED_ROWS.find(x=>String(x.art)===String(a)); if(!r) return;
+  q=Math.max(0,Math.min(999999,Math.round(+q||0)));
+  const k=pedKey(f,o), m=PED_Q[k]||(PED_Q[k]={});
+  if(q===r.sug) delete m[r.art]; else m[r.art]=q;
+  const card=document.querySelector(`[data-pedcard="${r.art}"]`);
+  if(card){ card.classList.toggle('cero',!q);
+    const i=card.querySelector('[data-pedi]'); if(i&&document.activeElement!==i) i.value=q;
+    const mn=card.querySelector('[data-d="-1"]'); if(mn) mn.disabled=!q;
+    const x=card.querySelector('[data-pedx]'); if(x) x.innerHTML=pedExtra(r.art,q,r.sug); }
+  const t=$('#pedTot'); if(t) t.innerHTML=pedTotHTML(f,o);
+  const rs=$('#pedReset'); if(rs) rs.hidden=!pedEdit(f,o);
+  const c=$('#copiado'); if(c) c.textContent='';
+}
 function copiarPedido2(){
-  const f=cur, o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0], v=fechaVisita(f), mN=MESL[v.m-1];
-  const L=PED_ROWS;
-  const txt=f.nombre+' — pedido para equilibrar enero–'+mN+' '+(v.y-1)+(o.k?' '+o.l:'')+'\n'+L.map(r=>'• '+P[r.art].n+' — '+r.sug+' unid.').join('\n')+'\nTotal: '+L.reduce((s,r)=>s+r.sug,0)+' unid. (Venta Real al '+D.corte.venta_real+')';
+  const f=cur, o=pedOptAct(), v=fechaVisita(f), mN=MESL[v.m-1];
+  const L=PED_ROWS.map(r=>({r, q:pedQ(f,o,r)})).filter(x=>x.q>0);
+  if(!L.length){ $('#copiado').textContent='El pedido no tiene cantidades.'; return; }
+  const txt=f.nombre+' — pedido (meta: enero–'+mN+' '+(v.y-1)+(o.k?' '+o.l:'')+')\n'+L.map(x=>'• '+P[x.r.art].n+' — '+x.q+' unid.').join('\n')+'\nTotal: '+L.reduce((s,x)=>s+x.q,0)+' unid. en '+L.length+' producto'+(L.length===1?'':'s');
   const ok=()=>{ $('#copiado').textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
   const fallback=()=>{ const t=$('#pedtxt'); t.hidden=false; t.value=txt; t.focus(); t.select(); $('#copiado').textContent='Seleccioná el texto y copialo.'; };
   try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
@@ -1311,14 +1349,14 @@ function smLinea(a, q){
 }
 function stockMega(f){
   const S=SM();
-  if(!S) return `<section class="sec"><div class="sec-h"><h2>Stock en el centro logístico</h2><span class="src">Megalabs</span></div>
-    <div class="soon"><b>Sin datos de stock</b><span class="small">Todavía no se cargó el stock de los depósitos de Megalabs.</span></div></section>`;
+  if(!S) return `<section class="sec"><div class="sec-h"><h2>Stock OTC Megalabs</h2><span class="src">Megalabs</span></div>
+    <div class="soon"><b>Sin datos de stock</b><span class="small">Todavía no se cargó el stock de D4.</span></div></section>`;
   const okI='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 12.5l3 3 6-6.5"/></svg>';
   const wI='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4.5"/><path d="M12 17.4v.1"/></svg>';
   // 1 · lo que se va a pedir
   let ped=[], pedT='';
   if(esFarmacia(f)&&!f.sin_datos){ const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
-    ped=calcPedido(f,o.f).rows.filter(r=>r.sug>0).map(r=>({a:String(r.art),q:r.sug})); pedT=`Productos del pedido <span class="small">(${o.k?'meta '+o.l:'igual a '+(fechaVisita(f).y-1)})</span>`; }
+    ped=calcPedido(f,o.f).rows.filter(r=>r.sug>0).map(r=>({a:String(r.art),q:pedQ(f,o,r)})).filter(x=>x.q>0); pedT=`Productos del pedido <span class="small">(${o.k?'meta '+o.l:'igual a '+(fechaVisita(f).y-1)})</span>`; }
   else if(f.tipo==='FARMASHOP'){ ped=repCadena(f).filter(p=>p.rep>0).map(p=>({a:String(p.art),q:p.rep})); pedT='Productos para reponer en la sucursal'; }
   // 2 · productos a incorporar (con la cantidad elegida, si la hay)
   const C=incCalc(f), Q=INC_Q[f.id]||{};
@@ -1341,13 +1379,13 @@ function stockMega(f){
   else res=`<div class="sm-res ok">${okI}<span>No hay pedido sugerido para esta visita. Abajo está el stock de los productos a incorporar y de todo el portafolio OTC.</span></div>`;
   const todos=Object.keys(P).sort((x,y)=>String(P[x].m).localeCompare(String(P[y].m))||P[x].n.localeCompare(P[y].n));
   const sin=todos.filter(a=>(smU(a)||0)<=0);
-  return `<section class="sec"><div class="sec-h"><h2>Stock en el centro logístico</h2><span class="src">Depósitos Megalabs · al ${esc(S.fecha)}</span></div>
+  return `<section class="sec"><div class="sec-h"><h2>Stock OTC Megalabs</h2><span class="src">D4 · al ${esc(S.fecha)}</span></div>
     ${res}
     ${ped.length?`<h3 class="sm-h">${pedT}</h3>${tabla(ped,esFarmacia(f)?'Pedir':'Reponer')}`:''}
     ${inc.length?`<h3 class="sm-h">Productos a Incorporar</h3>${tabla(inc,'Elegido')}`:''}
     <details class="sm-all"><summary>Stock de todo el portafolio OTC (${todos.length} productos${sin.length?`, ${sin.length} sin stock`:''})</summary>
       <table class="ptab sm"><thead><tr><th>Producto</th><th>En Mega</th></tr></thead><tbody>${todos.map(a=>`<tr><td>${nom(a)}</td><td class="num">${(smU(a)||0)>0?`<b class="num">${n0(smU(a))}</b>`:'<span class="chip-s nost">Sin stock</span>'}</td></tr>`).join('')}</tbody></table></details>
-    <span class="small">Unidades disponibles en los depósitos de Megalabs al ${esc(S.fecha)}. El stock cambia con los pedidos de cada día: es una referencia para ofrecer, no una reserva.</span>
+    <span class="small">Unidades disponibles en D4 al ${esc(S.fecha)}. El stock cambia con los pedidos de cada día: es una referencia para ofrecer, no una reserva.</span>
   </section>`;
 }
 
@@ -1467,10 +1505,15 @@ function enviarInc(){
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-pedopt]'); if(b){ pedOpt=+b.dataset.pedopt; store.set('pedopt',pedOpt); renderFarmTab(); return; }
   if(e.target.closest('#copiarP')) copiarPedido2();
+  const pq=e.target.closest('[data-pedq]'); if(pq){ const r=PED_ROWS.find(x=>String(x.art)===pq.dataset.pedq); if(r) setPedQ(r.art, pedQ(cur,pedOptAct(),r)+(+pq.dataset.d)); return; }
+  if(e.target.closest('#pedReset')){ delete PED_Q[pedKey(cur,pedOptAct())]; renderFarmTab(); return; }
   const q=e.target.closest('[data-incq]'); if(q){ const a=q.dataset.incq; setIncQ(a, (incQ(cur)[a]||0)+(+q.dataset.d)); return; }
   if(e.target.closest('#enviarInc')) enviarInc();
 });
-document.addEventListener('input',e=>{ const i=e.target.closest&&e.target.closest('[data-inci]'); if(i) setIncQ(i.dataset.inci, i.value); });
+document.addEventListener('input',e=>{ const i=e.target.closest&&e.target.closest('[data-inci]'); if(i) setIncQ(i.dataset.inci, i.value);
+  const pi=e.target.closest&&e.target.closest('[data-pedi]'); if(pi&&pi.value!=='') setPedQ(pi.dataset.pedi, pi.value); });
+document.addEventListener('change',e=>{ const pi=e.target.closest&&e.target.closest('[data-pedi]'); if(!pi) return; if(pi.value==='') setPedQ(pi.dataset.pedi,0);
+  const r=PED_ROWS.find(x=>String(x.art)===pi.dataset.pedi); if(r) pi.value=pedQ(cur,pedOptAct(),r); });
 document.addEventListener('change',e=>{ const i=e.target.closest&&e.target.closest('[data-inci]'); if(i) i.value=incQ(cur)[i.dataset.inci]||''; });
 
 // ---- v1.27 · Tarjeta del brick en lenguaje simple: primero el tamaño del mercado, después la parte de Megalabs
@@ -1893,7 +1936,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.30';
+const APP_VERSION='1.31';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
