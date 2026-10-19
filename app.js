@@ -1181,52 +1181,69 @@ function fechaVisita(f){
 const ym=(y,m)=>y+'-'+String(m).padStart(2,'0');
 const uDe=(f,a)=>{ const p=(f.productos||[]).find(x=>x.art==a); return p? (p.u12!=null?p.u12:(p.u||0)) : 0; };
 
-// ---------- Pedidos ----------
+// ---------- Pedidos (v1.23: equilibrar el acumulado del año contra 2025) ----------
+// Meta = lo que compró de enero al mes de la visita en el año anterior (× 1 / 1,02 / 1,04).
+// Pedido = meta − lo que ya compró en el año, con tope de 3 meses de su compra habitual (o lo del mismo mes del año pasado, si es mayor),
+// para no sobrecargar a la farmacia; lo que exceda el tope queda pendiente para las próximas visitas.
 const PED_OPTS=[{k:0,f:1,l:'Igual'},{k:2,f:1.02,l:'+2%'},{k:4,f:1.04,l:'+4%'}];
+const PED_TOPE_MESES=3;
 let pedOpt = store.get('pedopt',0);
 let PED_ROWS=[];
 function calcPedido(f, factor){
-  const v=fechaVisita(f), base=ym(v.y-1,v.m), act=ym(v.y,v.m), iB=MI.indexOf(base), iA=MI.indexOf(act);
+  const v=fechaVisita(f), m=v.m, last=MI.length-1;
+  const idx=(y,mm)=>MI.indexOf(ym(y,mm));
+  const i25=[], i26=[]; for(let k=1;k<=m;k++){ const a=idx(v.y-1,k), b=idx(v.y,k); if(a>=0) i25.push(a); if(b>=0) i26.push(b); }
+  const i12=[]; for(let i=Math.max(0,last-11);i<=last;i++) i12.push(i);
+  const iMes=idx(v.y-1,m);
+  const ult26 = i26.length ? MI[Math.max(...i26)] : null;
   const rows=[];
   Object.entries(f.skum||{}).forEach(([a,arr])=>{
-    const bu=(arr.find(r=>r[0]===iB)||[0,0])[1]||0; if(bu<=0) return;
-    const ya=iA>=0 ? Math.max(0,(arr.find(r=>r[0]===iA)||[0,0])[1]||0) : 0;
+    const sum=ix=>Math.max(0, arr.filter(r=>ix.includes(r[0])).reduce((s,r)=>s+(r[1]||0),0));
+    const y25=sum(i25), y26=sum(i26); if(y25<=0&&y26<=0) return;
+    const u12=sum(i12), mes25=iMes>=0?sum([iMes]):0, prom=Math.max(u12/12, y25/Math.max(1,i25.length));
+    const meta=Math.round(y25*factor), falta=Math.max(0,meta-y26);
+    const tope=Math.max(Math.ceil(PED_TOPE_MESES*prom), mes25);
+    const sug=Math.min(falta,tope), pend=falta-sug;
     const lp=[...arr].filter(r=>r[1]>0&&r[3]>0).sort((x,y)=>y[0]-x[0])[0];
-    rows.push({art:a, base:bu, ya, precio: lp? lp[3]/lp[1] : null});
+    const estado = y25>0&&y26===0 ? 'dejo' : (y25===0 ? 'nuevo' : (falta===0 ? 'ok' : (pend>0 ? 'tope' : 'normal')));
+    rows.push({art:a, y25, y26, meta, falta, sug, pend, prom, tope, estado, precio: lp? lp[3]/lp[1] : null});
   });
-  // reparto por mayor resto: el total queda exactamente en +0 / +2 / +4 %
-  const ideal=rows.map(r=>r.base*factor), fl=ideal.map(Math.floor);
-  let rest=Math.round(ideal.reduce((s,x)=>s+x,0))-fl.reduce((s,x)=>s+x,0);
-  ideal.map((x,i)=>[x-fl[i],i]).sort((p,q)=>q[0]-p[0]).forEach(([,i])=>{ if(rest>0){ fl[i]++; rest--; } });
-  rows.forEach((r,i)=>{ r.meta=fl[i]; r.sug=Math.max(0,r.meta-r.ya); });
-  rows.sort((p,q)=>q.sug-p.sug||q.base-p.base);
-  return {v, base, act, iB, iA, rows};
+  rows.sort((p,q)=>q.sug-p.sug||q.falta-p.falta||q.y25-p.y25);
+  return {v, m, i25, i26, ult26, rows};
 }
 function pedidos(f){
   if(f.sin_datos) return `<div class="empty">Sin compras registradas en Venta Real para armar un pedido.</div>`;
   if(!esFarmacia(f)) return pedidoCadena(f);
   const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
-  const C=calcPedido(f,o.f), mB=MESL[C.v.m-1], yB=C.v.y-1;
-  PED_ROWS=C.rows;
-  const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.l}</b>${x.k===0?'que '+mB.slice(0,3)+'-'+String(yB).slice(2):'en unidades'}</button>`).join('');
+  const C=calcPedido(f,o.f), mN=MESL[C.m-1], y=C.v.y;
+  const per25=C.m===1?`enero ${y-1}`:`enero–${mN} ${y-1}`, per25c=`ene–${mN.slice(0,3)} ${String(y-1).slice(2)}`;
+  const mu=C.ult26?MESL[+C.ult26.slice(5)-1]:null, per26c=C.ult26?`ene–${mu.slice(0,3)} ${String(y).slice(2)}`:'2026';
+  PED_ROWS=C.rows.filter(r=>r.sug>0);
+  const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.k?x.l:'Igual a '+(y-1)}</b>acumulado ${per25c}</button>`).join('');
   const inc=(f.pedido||[]).filter(q=>q.tipo==='incorporar').length;
-  const head=`<section class="sec"><div class="sec-h"><h2>Pedido sugerido</h2><span class="src">Venta Real · unidades</span></div>
-    <span class="small" style="margin-top:-4px">Visita de ${mB} ${C.v.y}: se toma lo que compró en ${mB} ${yB}.</span>
-    <div class="opt3" role="group" aria-label="Tipo de pedido">${btns}</div>`;
-  if(C.iB<0) return head+`<div class="empty">No hay datos de ${mB} ${yB} para comparar.</div></section>`;
-  if(!C.rows.length) return head+`<div class="empty">En ${mB} de ${yB} no compró productos OTC de Megalabs, así que no hay un pedido base para repetir.${inc?' Mirá <button class="btn sec2" data-goto="desvio">Desvío vs Brick</button> para productos a incorporar.':''}</div></section>`;
-  const tB=C.rows.reduce((s,r)=>s+r.base,0), tM=C.rows.reduce((s,r)=>s+r.meta,0), tY=C.rows.reduce((s,r)=>s+r.ya,0), tS=C.rows.reduce((s,r)=>s+r.sug,0);
-  const val=C.rows.reduce((s,r)=>s+(r.precio?r.precio*r.sug:0),0);
-  const colYa=C.iA>=0;
+  const head=`<section class="sec"><div class="sec-h"><h2>Pedido para equilibrar el año</h2><span class="src">Venta Real · unidades</span></div>
+    <span class="small" style="margin-top:-4px">Visita de ${mN} ${y}. Meta: lo que compró de ${per25}${o.k?` más un ${o.k}%`:''}. Se descuenta lo que ya compró en ${y} (Venta Real al ${D.corte.venta_real}).</span>
+    <div class="opt3" role="group" aria-label="Meta del pedido">${btns}</div>`;
+  if(!C.i25.length) return head+`<div class="empty">No hay datos de ${per25} para comparar.</div></section>`;
+  if(!C.rows.length) return head+`<div class="empty">No compró productos OTC de Megalabs ni en ${per25} ni en ${y}.</div></section>`;
+  const T=k=>C.rows.reduce((s,r)=>s+r[k],0);
+  const tY25=T('y25'), tMeta=T('meta'), tY26=T('y26'), tFalta=T('falta'), tSug=T('sug'), tPend=T('pend');
+  const val=PED_ROWS.reduce((s,r)=>s+(r.precio?r.precio*r.sug:0),0);
+  const ok=C.rows.filter(r=>r.estado==='ok'||r.estado==='nuevo');
+  const nota=r=> r.estado==='dejo'?'<small>Lo compró en '+(y-1)+' y en '+y+' todavía no</small>'
+    : r.estado==='tope'?`<small>Tope: ${PED_TOPE_MESES} meses de su compra habitual · quedan ${n0(r.pend)} para próximas visitas</small>` : '';
+  const L=C.rows.filter(r=>r.sug>0);
   return head+`
-    <div class="ptot"><span>Pedido: <b class="num">${n0(tS)}</b> unid. en ${C.rows.filter(r=>r.sug>0).length} productos</span><span class="small num">${mB.slice(0,3)}-${String(yB).slice(2)}: ${n0(tB)} unid. → meta ${n0(tM)}${colYa?' · ya compró '+n0(tY):''}${val?' · ≈ '+moneyC(val):''}</span></div>
-    <table class="ptab"><thead><tr><th>Producto</th><th>${mB.slice(0,3)}-${String(yB).slice(2)}</th>${colYa?`<th>Ya ${mB.slice(0,3)}-${String(C.v.y).slice(2)}</th>`:''}<th>Pedir</th></tr></thead><tbody>
-    ${C.rows.map(r=>`<tr><td>${esc((P[r.art]||{n:r.art}).n)}${r.sug===0?'<small>Ya cubierto este mes</small>':''}</td><td class="num">${n0(r.base)}</td>${colYa?`<td class="num">${n0(r.ya)}</td>`:''}<td class="num psug">${n0(r.sug)}</td></tr>`).join('')}
-    </tbody></table>
-    <span class="small">${colYa?`Se descuenta lo que ya compró en ${mB} ${C.v.y} (Venta Real al ${D.corte.venta_real}).`:`Venta Real llega hasta el ${D.corte.venta_real}: todavía no hay compras de ${mB} ${C.v.y} para descontar.`} Unidades de facturación; el valor es aproximado, con el precio neto de la última compra.</span>
+    <div class="ptot"><span>Pedido: <b class="num">${n0(tSug)}</b> unid. en ${L.length} producto${L.length===1?'':'s'}${val?` <span class="small">≈ ${moneyC(val)}</span>`:''}</span>
+      <span class="small num">${per25c}: ${n0(tY25)} unid.${o.k?` → meta ${n0(tMeta)}`:''} · ${per26c}: ${n0(tY26)} · faltan ${n0(tFalta)} en los productos atrasados${tPend?` · ${n0(tPend)} quedan para próximas visitas`:''}</span>${tY26>=tMeta?`<span class="small">En total ya superó la meta; el pedido equilibra los productos que vienen atrasados.</span>`:''}</div>
+    ${L.length?`<table class="ptab"><thead><tr><th>Producto</th><th>${per25c}</th><th>${per26c}</th><th>Pedir</th></tr></thead><tbody>
+    ${L.map(r=>`<tr><td>${esc((P[r.art]||{n:r.art}).n)}${nota(r)}</td><td class="num">${n0(r.y25)}</td><td class="num">${n0(r.y26)}</td><td class="num psug">${n0(r.sug)}</td></tr>`).join('')}
+    </tbody></table>`:`<div class="empty">En todos sus productos ya compró en ${y} lo mismo o más que en ${per25}${o.k?` ${o.l}`:''}: no hace falta equilibrar.</div>`}
+    ${ok.length?`<details><summary class="small">${ok.length} producto${ok.length===1?'':'s'} ya ${ok.length===1?'supera':'superan'} lo de ${y-1} (no hace falta pedir para equilibrar)</summary><div class="small" style="padding-top:6px">${ok.map(r=>esc((P[r.art]||{n:r.art}).n)+' ('+n0(r.y26)+' vs. '+n0(r.y25)+')').join(' · ')}</div></details>`:''}
+    <span class="small">Cómo se calcula: para cada producto, lo que compró de ${per25}${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, menos lo que ya compró en ${y}. Para no sobrecargar a la farmacia, cada producto tiene un tope de ${PED_TOPE_MESES} meses de su compra habitual (el promedio mensual más alto entre los últimos 12 meses y ${per25}) o lo que compró en ${mN} de ${y-1}, si es mayor. Compras posteriores al ${D.corte.venta_real} todavía no figuran. Valor aproximado con el precio neto de la última compra.</span>
     ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Desvío vs Brick</button>.</span>`:''}
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">Copiar pedido</button><span class="small" id="copiado" aria-live="polite" style="align-self:center"></span></div>
-    <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>
+    ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">Copiar pedido</button><span class="small" id="copiado" aria-live="polite" style="align-self:center"></span></div>
+    <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
   </section>`;
 }
 function pedidoCadena(f){
@@ -1244,9 +1261,9 @@ function pedidoCadena(f){
   </section>`;
 }
 function copiarPedido2(){
-  const f=cur, o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0], v=fechaVisita(f);
-  const L=PED_ROWS.filter(r=>r.sug>0);
-  const txt=f.nombre+' — pedido '+(o.k?o.l+' vs. ':'igual a ')+MESL[v.m-1]+' '+(v.y-1)+'\n'+L.map(r=>'• '+P[r.art].n+' — '+r.sug+' unid.').join('\n')+'\nTotal: '+L.reduce((s,r)=>s+r.sug,0)+' unid.';
+  const f=cur, o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0], v=fechaVisita(f), mN=MESL[v.m-1];
+  const L=PED_ROWS;
+  const txt=f.nombre+' — pedido para equilibrar enero–'+mN+' '+(v.y-1)+(o.k?' '+o.l:'')+'\n'+L.map(r=>'• '+P[r.art].n+' — '+r.sug+' unid.').join('\n')+'\nTotal: '+L.reduce((s,r)=>s+r.sug,0)+' unid. (Venta Real al '+D.corte.venta_real+')';
   const ok=()=>{ $('#copiado').textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
   const fallback=()=>{ const t=$('#pedtxt'); t.hidden=false; t.value=txt; t.focus(); t.select(); $('#copiado').textContent='Seleccioná el texto y copialo.'; };
   try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
@@ -1255,7 +1272,7 @@ function copiarPedido2(){
 // ---------- Stock Mega (preparado, sin fuente de datos todavía) ----------
 function stockMega(f){
   const C=esFarmacia(f)&&!f.sin_datos ? calcPedido(f,1) : {rows:[]};
-  const L=C.rows.slice(0,8);
+  const L=C.rows.filter(r=>r.sug>0).slice(0,8);
   return `<section class="sec"><div class="sec-h"><h2>Stock en el centro logístico</h2><span class="src">Megalabs</span></div>
     <div class="soon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M8 20v-7h8v7"/><path d="M8 16h8"/></svg>
       <b>Próximamente</b><span class="small">Cuando se conecte el stock del centro logístico, acá vas a ver si cada producto tiene stock o está en quiebre antes de ofrecerlo, empezando por los del pedido.</span></div>
@@ -1732,7 +1749,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.22';
+const APP_VERSION='1.23';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
