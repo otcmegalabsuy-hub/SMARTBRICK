@@ -1154,7 +1154,7 @@ function marcaScreen(f){
 
 const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const TABS_INFO=f=>[['resumen','Resumen'],[esFarmacia(f)?'compras':'ventas',esFarmacia(f)?'Compras':'Ventas'],['zona','Zona'],['marca','Marcas']];
-const TABS_ACC=[['pedidos','Pedidos'],['stock','Stock<br>Mega'],['rotacion','Baja<br>Rotación'],['desvio','Desvío<br>vs Brick']];
+const TABS_ACC=[['pedidos','Pedidos'],['stock','Stock<br>Mega'],['rotacion','Baja<br>Rotación'],['desvio','A incorporar']];
 function tabsHTML(f){
   const b=([k,l])=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${k===curTab}">${l}</button>`;
   const ICK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -1241,7 +1241,7 @@ function pedidos(f){
     </tbody></table>`:`<div class="empty">En todos sus productos ya compró en ${y} lo mismo o más que en ${per25}${o.k?` ${o.l}`:''}: no hace falta equilibrar.</div>`}
     ${ok.length?`<details><summary class="small">${ok.length} producto${ok.length===1?'':'s'} ya ${ok.length===1?'supera':'superan'} lo de ${y-1} (no hace falta pedir para equilibrar)</summary><div class="small" style="padding-top:6px">${ok.map(r=>esc((P[r.art]||{n:r.art}).n)+' ('+n0(r.y26)+' vs. '+n0(r.y25)+')').join(' · ')}</div></details>`:''}
     <span class="small">Cómo se calcula: para cada producto, lo que compró de ${per25}${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, menos lo que ya compró en ${y}. Para no sobrecargar a la farmacia, cada producto tiene un tope de ${PED_TOPE_MESES} meses de su compra habitual (el promedio mensual más alto entre los últimos 12 meses y ${per25}) o lo que compró en ${mN} de ${y-1}, si es mayor. Compras posteriores al ${D.corte.venta_real} todavía no figuran. Valor aproximado con el precio neto de la última compra.</span>
-    ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Desvío vs Brick</button>.</span>`:''}
+    ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver A incorporar</button>.</span>`:''}
     ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">Enviar pedido</button><span class="small" id="copiado" aria-live="polite" style="align-self:center"></span></div>
     <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
   </section>`;
@@ -1330,32 +1330,27 @@ function rotHTML(L, nota){
   </section>`;
 }
 
-// ---------- Desvío vs Brick ----------
+// ---------- A incorporar (v1.25): productos de Megalabs que se venden en el brick y esta farmacia no comercializa ----------
 function desvioBrick(f){
   const cz=f.brick&&D.cuPres?D.cuPres[f.brick]:null;
   if(!cz) return `<div class="empty">No hay datos de CloseUp para el brick de este punto de venta.</div>`;
-  if(f.sin_datos) return `<div class="empty">Sin compras registradas para comparar con el brick.</div>`;
-  const esF=esFarmacia(f);
+  const esF=esFarmacia(f), per=esF?'al año':'por mes';
   const arts=Object.keys(cz).filter(a=>P[a]&&cz[a][1]>0), Tz=arts.reduce((s,a)=>s+cz[a][1],0);
-  const uF=a=>{ const p=(f.productos||[]).find(x=>x.art==a); return p?(esF?(p.u12||0):(p.u||0)):0; };
+  const prod=a=>(f.productos||[]).find(x=>x.art==a)||{};
+  const uF=a=>{ const p=prod(a); return esF?(p.u12||0):(p.u||0); };
   const Tf=(f.productos||[]).reduce((s,p)=>s+(esF?(p.u12||0):(p.u||0)),0);
-  if(!Tz||!Tf) return `<div class="empty">No hay suficientes datos para comparar con el brick.</div>`;
-  const s=factorTam(arts.map(a=>[uF(a),cz[a][1]]), Tf/Tz);
-  const L=[];
-  arts.forEach(a=>{
-    const z=cz[a][1]/Tz; if(z<0.01) return;
-    const u=uF(a), exp=cz[a][1]*s, idx=u/exp, pot=exp-u;
-    if(idx>=0.6||pot<(esF?6:2)) return;
-    L.push({a, z, p:u/Tf, idx, exp, pot, u, zu:cz[a][1]});
-  });
-  L.sort((x,y)=>y.pot-x.pot);
-  const per=esF?'al año':'por mes';
-  return `<section class="sec"><div class="sec-h"><h2>Lo que debería venderse más</h2><span class="src">CloseUp · brick ${f.brick}</span></div>
-    <span class="small" style="margin-top:-4px">Productos que en el brick venden más de lo que ${esF?'compra esta farmacia':'vende esta sucursal'}, comparando con su relación habitual con el brick (CloseUp año móvil a ${esc(D.corte.closeup.replace(/\s*\(MAT\)/,''))} · ${esF?'Venta Real, 12 meses':'Sell-Out agosto'}).</span>
-    ${L.length?`<div class="acc">${L.slice(0,10).map(x=>`<div class="acc-i"><div class="t"><b>${esc(P[x.a].n)}</b><span class="num">+${n0(x.pot)} unid. ${per}</span></div>
-      <div class="meter" aria-hidden="true"><i style="width:${Math.min(100,Math.round(x.idx*100))}%"></i></div>
-      <p>${x.u===0?'<span class="chip-s inc">Incorporar</span> No lo '+(esF?'compra':'vende')+'. Al nivel del brick serían <b>'+n0(x.exp)+'</b>.':`Hoy ${n0(x.u)} unid. ${per}; al nivel del brick serían <b>${n0(x.exp)}</b>.`} En el brick es el ${nf1.format(x.z*100)}% de las unidades de Megalabs.</p></div>`).join('')}</div>`
-      :'<div class="empty">Ningún producto está claramente por debajo de lo que se vende en el brick.</div>'}
+  const s=factorTam(arts.map(a=>[uF(a),cz[a][1]]), Tz&&Tf?Tf/Tz:0);
+  const L=arts.filter(a=>uF(a)<=0).map(a=>{ const p=prod(a);
+    return {a, zu:cz[a][1], z:Tz?cz[a][1]/Tz:0, exp:s?cz[a][1]*s:null, ult:p.ult||null, dias:p.dias, listado:p.listado, stock:p.stock}; })
+    .sort((x,y)=>y.zu-x.zu);
+  const estado=x=> esF ? (x.ult?`Última compra: ${fdate(x.ult)} (hace ${n0(x.dias)} días al ${D.corte.venta_real})`:'Nunca lo compró desde enero de 2025')
+    : (x.listado===false?'No está listado en esta sucursal':`Listado sin ventas en ${perSO()}${x.stock!=null?` · stock ${n0(x.stock)}`:''}`);
+  return `<section class="sec"><div class="sec-h"><h2>A incorporar</h2><span class="src">${L.length} producto${L.length===1?'':'s'}</span></div>
+    <span class="small" style="margin-top:-4px">Productos de Megalabs que se venden en el brick ${f.brick} (${esc(zonaCorta(f.brick))}) y que ${esF?`esta farmacia no compró en los últimos 12 meses (Venta Real al ${D.corte.venta_real})`:`esta sucursal no vendió en ${perSO()} (Sell-Out ${esc(TIPO[f.tipo])})`}. Ventas del brick: CloseUp, ${perCU()}.</span>
+    ${L.length?`<div class="acc">${L.map(x=>`<div class="acc-i"><div class="t"><b>${esc(P[x.a].n)}</b><span class="num">${n0(x.zu)} unid./año en el brick</span></div>
+      <p>Es el ${nf1.format(x.z*100)}% de las unidades de Megalabs en el brick.${x.exp!=null&&x.exp>=1?` Si se vendiera acá como en el brick: ~${n0(x.exp)} unid. ${per}.`:''}</p>
+      <p class="small" style="margin:0">${estado(x)}</p></div>`).join('')}</div>`
+      :`<div class="empty">${esF?'Esta farmacia ya compra':'Esta sucursal ya vende'} todos los productos de Megalabs que se venden en su brick.</div>`}
   </section>`;
 }
 document.addEventListener('click',e=>{
@@ -1749,7 +1744,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.24';
+const APP_VERSION='1.25';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
