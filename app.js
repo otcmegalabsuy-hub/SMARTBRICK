@@ -1172,6 +1172,11 @@ function marcaScreen(f){
 .chip-s.low{background:#FAF0D6;color:#7A5300}
 .qsel.qw input{width:66px}
 .nw{white-space:nowrap}
+.cadnote{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,#E6F6F4,#D7F0ED);border:1px solid rgba(55,180,174,.35);color:var(--ink)}
+.cadnote svg{flex-shrink:0;color:var(--tq-text);margin-top:1px}
+.cadnote div{display:flex;flex-direction:column;gap:3px}
+.cadnote b{font-size:15px;color:var(--tq-text)}
+.cadnote span{font-size:13.5px;line-height:1.45;color:#2B302E}
 .facref{display:flex;flex-direction:column;gap:3px;border:1.5px dashed #9FD3CE;border-radius:9px;padding:10px 12px;font-size:14px;line-height:1.4;background:var(--surface)}
 .facref>b{font-size:13px;letter-spacing:.03em;text-transform:uppercase;color:var(--tq-text)}
 .pedc .pmeta{font-size:13px;color:#2B302E;margin:0}
@@ -1256,7 +1261,7 @@ function facHTML(f){
 }
 function pedidos(f){
   if(f.sin_datos) return `<div class="empty">Sin compras registradas en Venta Real para armar un pedido.</div>`;
-  if(!esFarmacia(f)) return f.tipo==='FARMASHOP' ? pedidosSuc(f) : pedidoCadena(f);
+  if(!esFarmacia(f)) return (D.cadenas&&D.cadenas[f.tipo]) ? pedidosCentral(f) : (f.tipo==='FARMASHOP' ? pedidosSuc(f) : pedidoCadena(f));
   const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
   const C=calcPedido(f,o.f), c=C.c, Y=c.y, mN=MESL[C.v.m-1];
   const p25=c.m===1?`enero ${Y-1}`:`enero–${MESL[c.m-1]} ${Y-1}`, p26=c.m===1?`enero ${Y}`:`enero–${MESL[c.m-1]} ${Y}`;
@@ -1346,6 +1351,50 @@ function pedidosSuc(f){
     <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
   </section>`;
 }
+// ---------- v1.39 · Cadenas: pedido semanal CENTRAL (una compra por semana para todas las sucursales) ----------
+// Base: lo que vende la cadena en una semana (Sell-Out del mes, todas sus sucursales ÷ semanas del mes) × meta.
+// Si las sucursales tienen poco stock (menos de 3 semanas de venta), se suma la cuarta parte de lo que falta para llegar a 3 semanas.
+const COB_OBJ=3;
+function calcPedidoCentral(f, factor){
+  const C=D.cadenas[f.tipo], sem=C.dias/7, rows=[];
+  const suc=a=>{ const p=(f.productos||[]).find(x=>String(x.art)===String(a)); return p?(p.u||0):0; };
+  Object.entries(C.p).forEach(([a,v])=>{
+    if(!P[a]) return; const [u,st,sv]=v; if(u<=0) return;
+    const V=u/sem, base=V*factor, cob=st==null?null:st/V;
+    const extra = cob!=null&&cob<COB_OBJ ? Math.max(0,(COB_OBJ*V-st)/4) : 0;
+    const sug=Math.round(base+extra);
+    rows.push({art:a, u, V, stock:st, cob, extra:Math.round(extra), sug, hab:V, suc:suc(a), sv, precio:precioCartera(a), estado:extra>0?'bajo':'normal'});
+  });
+  rows.sort((x,y)=>y.sug-x.sug||y.u-x.u);
+  return {rows, C, sem};
+}
+function pedidosCentral(f){
+  const o=pedOptAct(), R=calcPedidoCentral(f,o.f), C=R.C, T=esc(TIPO[f.tipo]), mes=perSO(), so=D.corte.cadenas;
+  PED_ROWS=R.rows.filter(r=>r.sug>0);
+  const L=PED_ROWS, tu=R.rows.reduce((s,r)=>s+r.u,0), tV=tu/R.sem, ts=C.con_stock?R.rows.reduce((s,r)=>s+(r.stock||0),0):null;
+  const mio=(f.productos||[]).filter(p=>P[p.art]).reduce((s,p)=>s+(p.u||0),0);
+  const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.k?x.l:'Igual'}</b>vs. venta semanal</button>`).join('');
+  const inc=(()=>{ const c=incCalc(f); return c?c.L.length:0; })();
+  return `<section class="sec"><div class="sec-h"><h2>Realizar pedido</h2><span class="src">Sell-Out ${T} · ${so}</span></div>
+    <div class="cadnote" role="note"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/><path d="M9 21v-6h6v6"/><path d="M9 11h6"/></svg>
+      <div><b>Pedido semanal central de ${T}</b><span>${T} compra una vez por semana, de forma centralizada, para sus ${C.n_suc} sucursales. Este pedido es el de toda la cadena (no el de esta sucursal) y es el mismo en todas sus fichas.</span></div></div>
+    <span class="small" style="margin-top:-2px">Una semana de venta de la cadena${o.k?` +${o.k}%`:''}${C.con_stock?`, más un refuerzo donde las sucursales tienen poco stock`:''}. Las cantidades vienen precargadas: ajustalas con − y +.</span>
+    <div class="opt3" role="group" aria-label="Meta del pedido">${btns}</div>
+    <div class="ptot"><span id="pedTot">${pedTotHTML(f,o)}</span>
+      <span class="small num">Venta semanal de la cadena: ${n0(tV)} unid. (${n0(tu)} en ${mes}, ${C.n_suc} sucursales)${ts!=null?` · stock en sucursales: ${n0(ts)} unid. (≈ ${nf1.format(ts/tV)} semanas)`:''} · esta sucursal vendió ${n0(mio)} en ${mes} (${tu?nf1.format(mio/tu*100):0}% de la cadena)</span></div>
+    ${L.length?`<div class="acc">${L.map(r=>{ const q=pedQ(f,o,r), nm=esc((P[r.art]||{n:r.art}).n);
+      const nota = r.extra>0 ? `Poco stock en sucursales (${nf1.format(r.cob)} sem.): incluye ${n0(r.extra)} de refuerzo. ` : '';
+      return `<div class="acc-i pedc${q?'':' cero'}" data-pedcard="${r.art}"><div class="t tq"><b>${nm}</b>${qselPed(r.art,q,nm)}</div>
+        <p class="pmeta num"><span class="nw">Por semana: <b>${n0(r.V)}</b></span>${r.cob!=null?` · <span class="nw">stock: <b>${n0(r.stock)}</b> (${nf1.format(r.cob)} sem.)</span>`:''}</p>
+        <p class="pmeta num"><span class="nw">Sugerido: <b>${n0(r.sug)}</b></span> <span class="small">· esta sucursal: ${n0(r.suc)} en ${so}</span></p>
+        <p class="small pnote"${nota?' data-n="1"':''}${nota||pedExtra(r.art,q,r.sug)?'':' hidden'}>${nota} <span data-pedx="${r.art}">${pedExtra(r.art,q,r.sug)}</span></p></div>`; }).join('')}</div>
+    <button class="back" id="pedReset" style="min-height:32px;padding:0;align-self:flex-start"${pedEdit(f,o)?'':' hidden'}>Volver a las cantidades sugeridas</button>`:`<div class="empty">No hay ventas de productos Megalabs en el Sell-Out de ${T} de ${mes}.</div>`}
+    <details class="uinfo"><summary>¿Cómo se calcula?</summary><p>${T} no compra por sucursal: hace una compra central por semana que después distribuye a sus ${C.n_suc} sucursales. Por eso el pedido es uno solo para toda la cadena, y los cambios que hagas en las cantidades se ven en la ficha de cualquiera de sus sucursales.</p><p>Para cada producto: lo que vendieron todas las sucursales en ${mes} (Sell-Out ${T}) dividido las ${nf1.format(R.sem)} semanas del mes${o.k?`, × ${o.f.toFixed(2).replace('.',',')}`:''}.${C.con_stock?` Si el stock de las sucursales al cierre alcanza para menos de ${COB_OBJ} semanas de venta, se suma la cuarta parte de lo que falta para llegar a ${COB_OBJ} semanas. El stock del depósito central de la cadena no está en los datos.`:` ${T} no informa stock por sucursal: el pedido repone lo vendido.`} Valor aproximado con el precio neto promedio de la cartera.</p></details>
+    ${inc?`<span class="small">En esta sucursal hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no vendió: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Productos a Incorporar</button>.</span>`:''}
+    ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">${IXL}Enviar pedido (Excel)</button><button class="btn sec2" id="copiarPT">Copiar como texto</button><span class="small" id="copiado" aria-live="polite" style="align-self:center;flex-basis:100%"></span></div>
+    <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
+  </section>`;
+}
 function pedidoCadena(f){
   const ps=(f.productos||[]).filter(p=>p.u>0||(p.stock!=null&&p.stock>0));
   const conStock=f.tipo==='FARMASHOP';
@@ -1363,7 +1412,7 @@ function pedidoCadena(f){
 // v1.31 · Cantidades del pedido editables: vienen precargadas con lo sugerido para la meta elegida (igual, +2% o +4%).
 // Los cambios se guardan por punto de venta y por meta mientras la app esté abierta.
 const PED_Q={};
-const pedKey=(f,o)=>f.id+'|'+o.k;
+const pedKey=(f,o)=>(esFarmacia(f)||!(D.cadenas&&D.cadenas[f.tipo])?f.id:'CADENA|'+f.tipo)+'|'+o.k;   // en cadenas el pedido es uno solo para todas sus sucursales
 const pedQ=(f,o,r)=>{ const m=PED_Q[pedKey(f,o)]; return m&&m[r.art]!=null?m[r.art]:r.sug; };
 const pedEdit=(f,o)=>{ const m=PED_Q[pedKey(f,o)]; return !!m&&Object.keys(m).length>0; };
 const pedOptAct=()=>PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
@@ -1416,6 +1465,7 @@ function stockMega(f){
   let ped=[], pedT='';
   if(esFarmacia(f)&&!f.sin_datos){ const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
     ped=calcPedido(f,o.f).rows.filter(r=>r.sug>0).map(r=>({a:String(r.art),q:pedQ(f,o,r)})).filter(x=>x.q>0); pedT=`Productos del pedido <span class="small">(${o.k?'meta '+o.l:'igual a '+(fechaVisita(f).y-1)})</span>`; }
+  else if(D.cadenas&&D.cadenas[f.tipo]){ const o=pedOptAct(); ped=calcPedidoCentral(f,o.f).rows.filter(r=>r.sug>0).map(r=>({a:r.art,q:pedQ(f,o,r)})).filter(x=>x.q>0); pedT=`Pedido semanal central de ${esc(TIPO[f.tipo])} <span class="small">(${o.k?'venta '+o.l:'igual a la venta'})</span>`; }
   else if(f.tipo==='FARMASHOP'){ const o=pedOptAct(); ped=calcPedidoSuc(f,o.f).rows.filter(r=>r.sug>0).map(r=>({a:r.art,q:pedQ(f,o,r)})).filter(x=>x.q>0); pedT=`Productos del pedido de la sucursal <span class="small">(${o.k?'venta '+o.l:'igual a la venta'})</span>`; }
   // 2 · productos a incorporar (con la cantidad elegida, si la hay)
   const C=incCalc(f), Q=INC_Q[f.id]||{};
@@ -1560,14 +1610,15 @@ function pedidoActual(kind){
   const f=cur;
   if(kind==='inc') return {f, tipo:'Productos a incorporar', items:incSel(f).map(x=>({a:String(x.a), q:x.q})), st:'#copiadoI', ta:'#pedtxtI', bx:'#enviarInc', bt:'#enviarIncT', vacio:'Elegí la cantidad de al menos un producto.'};
   const o=pedOptAct();
-  return {f, tipo:(esFarmacia(f)?'Pedido del mes':'Pedido de la sucursal')+(o.k?' ('+o.l+')':''), items:PED_ROWS.map(r=>({a:String(r.art), q:pedQ(f,o,r)})).filter(x=>x.q>0), st:'#copiado', ta:'#pedtxt', bx:'#copiarP', bt:'#copiarPT', vacio:'El pedido no tiene cantidades.'};
+  return {f, tipo:(esFarmacia(f)?'Pedido del mes':(D.cadenas&&D.cadenas[f.tipo]?'Pedido semanal central de '+TIPO[f.tipo]:'Pedido de la sucursal'))+(o.k?' ('+o.l+')':''), items:PED_ROWS.map(r=>({a:String(r.art), q:pedQ(f,o,r)})).filter(x=>x.q>0), st:'#copiado', ta:'#pedtxt', bx:'#copiarP', bt:'#copiarPT', vacio:'El pedido no tiene cantidades.'};
 }
 const codCli=f=>String(f.id).split('|')[1]||'';
 const fechaDMY=iso=>iso.split('-').reverse().join('/');
 // Texto (WhatsApp): una línea por producto con su código.
 function pedidoTexto(X){
   const f=X.f, t=X.items.reduce((s,x)=>s+x.q,0);
-  return `${f.nombre} (${esFarmacia(f)?'cliente':'sucursal'} ${codCli(f)}) — ${X.tipo.toLowerCase()}\n`+X.items.map(x=>`• ${x.a} · ${P[x.a].n} — ${x.q} unid.`).join('\n')+`\nTotal: ${t} unid. en ${X.items.length} producto${X.items.length===1?'':'s'}`;
+  const quien = esFarmacia(f) ? `${f.nombre} (cliente ${codCli(f)})` : (D.cadenas&&D.cadenas[f.tipo] ? `${TIPO[f.tipo]} · compra central para sus ${D.cadenas[f.tipo].n_suc} sucursales` : `${f.nombre} (sucursal ${codCli(f)})`);
+  return `${quien} — ${X.tipo.charAt(0).toLowerCase()+X.tipo.slice(1)}\n`+X.items.map(x=>`• ${x.a} · ${P[x.a].n} — ${x.q} unid.`).join('\n')+`\nTotal: ${t} unid. en ${X.items.length} producto${X.items.length===1?'':'s'}`;
 }
 function copiarTexto(kind){
   const X=pedidoActual(kind); if(!X.items.length){ $(X.st).textContent=X.vacio; return; }
@@ -1614,8 +1665,8 @@ function pedidoExcel(kind){
   const X=pedidoActual(kind); if(!X.items.length){ $(X.st).textContent=X.vacio; uxToast(X.vacio); return; }
   const f=X.f, fv=fechaVisita(f).iso, t=X.items.reduce((s,x)=>s+x.q,0), num=v=>isNaN(+v)||v===''?v:{v:+v,s:6};
   const rows=[[{v:'Pedido · SmartBrick',s:5}],
-    [{v:'Punto de venta',s:1},f.nombre],
-    [{v:esFarmacia(f)?'Código de cliente':'Sucursal',s:1},num(codCli(f))],
+    ...(esFarmacia(f)||!(D.cadenas&&D.cadenas[f.tipo]) ? [[{v:'Punto de venta',s:1},f.nombre],[{v:esFarmacia(f)?'Código de cliente':'Sucursal',s:1},num(codCli(f))]]
+      : [[{v:'Cliente',s:1},TIPO[f.tipo]+' · compra central semanal'],[{v:'Sucursales',s:1},{v:D.cadenas[f.tipo].n_suc,s:6}],[{v:'Armado en la visita a',s:1},f.nombre]]),
     [{v:'Tipo',s:1},X.tipo],
     [{v:'Fecha de visita',s:1},fechaDMY(fv)],
     [{v:'Vendedor',s:1},D.vendedor||''],
@@ -1624,7 +1675,7 @@ function pedidoExcel(kind){
     ...X.items.map(x=>[num(x.a), P[x.a].n, {v:x.q,s:3}]),
     [{v:'Total',s:1},{v:`${X.items.length} producto${X.items.length===1?'':'s'}`,s:1},{v:t,s:4}]];
   const blob=xlsxBlob(rows,[18,46,12],'Pedido');
-  const name=`${kind==='inc'?'Incorporar':'Pedido'}_${f.nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'')}_${fv}.xlsx`;
+  const name=`${kind==='inc'?'Incorporar':'Pedido'}_${(kind!=='inc'&&!esFarmacia(f)&&D.cadenas&&D.cadenas[f.tipo])?TIPO[f.tipo]+'_semanal':f.nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'')}_${fv}.xlsx`;
   const st=$(X.st);
   const bajar=()=>{ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); st.textContent='Se descargó '+name+'.'; uxToast('Excel descargado: '+name); uxOk($(X.bx),'Excel listo'); uxVib(12); };
   let file=null; try{ file=new File([blob],name,{type:blob.type}); }catch(e){}
@@ -2190,6 +2241,67 @@ document.addEventListener('click',e=>{
     const c=document.getElementById('cfg'); if(c) c.scrollIntoView({behavior:UX_RM?'auto':'smooth', block:'start'}); },60);
 });
 
+// ---- v1.39 · Voz: femenina y natural, con acento rioplatense.
+// 1) Voz natural del servidor del asistente (Azure AI Speech, es-UY-ValentinaNeural): suena humana y uruguaya.
+//    Se activa sola cuando el servidor tiene cargada la clave de Azure; si no, la app sigue con la voz del teléfono.
+// 2) Voz del teléfono: se elige la mejor voz femenina en español, priorizando Uruguay y Argentina y las voces
+//    "naturales" o "mejoradas" del sistema.
+const VOZ_F=/valentina|elena|paulina|m[oó]nica|isabel|sof[ií]a|helena|laura|luc[ií]a|camila|marisol|paloma|dalia|renata|francisca|catalina|marta|carmen|ximena|larissa|abril|lia|elvira|esperanza|female|mujer/i;
+const VOZ_M=/jorge|juan|diego|pablo|tom[aá]s|alvaro|[aá]lvaro|ra[uú]l|carlos|andr[eé]s|mateo|gerardo|enrique|pedro|male|hombre|alonso|emilio|rodrigo|sebasti[aá]n/i;
+ttsVoice=function(){
+  const vs=(SYN&&SYN.getVoices())||[], norm=l=>String(l||'').replace('_','-').toLowerCase();
+  const LANG={'es-uy':60,'es-ar':55,'es-419':35,'es-us':32,'es-mx':30,'es-cl':28,'es-co':26,'es-es':12};
+  let best=null, bs=-1e9;
+  vs.forEach(v=>{ const l=norm(v.lang); if(!/^es/.test(l)) return;
+    let s=(LANG[l]!=null?LANG[l]:8);
+    if(/natural|neural|online|premium|enhanced|mejorada|siri/i.test(v.name)) s+=30;
+    if(VOZ_F.test(v.name)) s+=22; if(VOZ_M.test(v.name)) s-=40;
+    if(/google/i.test(v.name)) s+=6; if(v.localService===false) s+=4;
+    if(s>bs){ bs=s; best=v; } });
+  return best;
+};
+const NAT={ ok:null, cache:new Map(), audio:null };
+function natAudio(){ if(!NAT.audio){ NAT.audio=new Audio(); NAT.audio.preload='auto'; try{ NAT.audio.preservesPitch=true; }catch(_){} } return NAT.audio; }
+// En iPhone el audio solo puede sonar si antes hubo un toque: se "destraba" con un silencio en el primer toque.
+(function(){ let ok=false;
+  const SIL='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+  document.addEventListener('click',()=>{ if(ok) return; ok=true; try{ const a=natAudio(); a.src=SIL; const p=a.play(); if(p&&p.catch) p.catch(()=>{}); }catch(_){} },true); })();
+const natOn=()=>!!(CONFIG.asistenteUrl&&SES&&SES.token&&NAT.ok!==false&&CONFIG.vozNatural!==false);
+function natFetch(t){
+  if(NAT.cache.has(t)) return NAT.cache.get(t);
+  const p=fetch(CONFIG.asistenteUrl,{method:'POST',body:JSON.stringify({token:SES.token, tts:t}),headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow'})
+    .then(r=>r.json()).then(j=>{ if(j&&j.audio) return 'data:audio/mpeg;base64,'+j.audio; throw new Error((j&&j.error)||'sin_audio'); });
+  NAT.cache.set(t,p); p.catch(()=>NAT.cache.delete(t));
+  if(NAT.cache.size>80) NAT.cache.delete(NAT.cache.keys().next().value);
+  return p;
+}
+const _ttsFromDev=ttsFrom, _ttsPauseDev=ttsPause, _ttsStopDev=ttsStop;
+ttsFrom=function(i){
+  if(!natOn()||!TTS.segs.length) return _ttsFromDev(i);
+  if(typeof ASK!=='undefined'&&ASK.sr) stopRec(true);
+  TTS.gen++; const gen=TTS.gen; if(SYN) SYN.cancel(); const a=natAudio(); a.pause();
+  TTS.i=i; TTS.playing=true; TTS.done=false; ttsUI();
+  const sub=t=>{ const s=document.getElementById('ttsSub'); if(s) s.textContent=t; };
+  const toca=async k=>{
+    if(gen!==TTS.gen) return;
+    if(k>=TTS.segs.length){ TTS.playing=false; TTS.done=true; TTS.i=0; ttsMark(true); ttsUI(); return; }
+    if(k===i) sub('Preparando la voz…');
+    let src;
+    try{ src=await natFetch(TTS.segs[k].t); }
+    catch(e){ if(gen!==TTS.gen) return; if(NAT.ok!==true) NAT.ok=false; return _ttsFromDev(k); }   // sin voz natural: sigue con la del teléfono
+    if(gen!==TTS.gen) return;
+    NAT.ok=true; TTS.i=k; ttsMark(); ttsUI();
+    if(k+1<TTS.segs.length) natFetch(TTS.segs[k+1].t).catch(()=>{});   // la frase siguiente se pide mientras suena esta
+    a.onended=()=>{ if(gen===TTS.gen) toca(k+1); };
+    a.onerror=()=>{ if(gen===TTS.gen) toca(k+1); };
+    a.src=src; a.playbackRate=TTS.rate;
+    try{ await a.play(); }catch(e){ if(gen!==TTS.gen) return; NAT.ok=false; _ttsFromDev(k); }
+  };
+  toca(i);
+};
+ttsPause=function(){ _ttsPauseDev(); if(NAT.audio) NAT.audio.pause(); };
+ttsStop=function(){ _ttsStopDev(); if(NAT.audio){ NAT.audio.pause(); NAT.audio.removeAttribute('src'); } };
+
 // ================= Asistente: preguntas habladas o escritas =================
 const ASK={turns:[], busy:false, ctl:null, tools:false, mode:'', clickOnly:false, wasHold:false, discard:false, sr:null, srBlocked:false, recTxt:'', recStart:0, timer:null, holding:false};
 const MIC='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>';
@@ -2542,7 +2654,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.38';
+const APP_VERSION='1.39';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
