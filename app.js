@@ -1172,6 +1172,8 @@ function marcaScreen(f){
 .chip-s.low{background:#FAF0D6;color:#7A5300}
 .qsel.qw input{width:66px}
 .nw{white-space:nowrap}
+.facref{display:flex;flex-direction:column;gap:3px;border:1.5px dashed #9FD3CE;border-radius:9px;padding:10px 12px;font-size:14px;line-height:1.4;background:var(--surface)}
+.facref>b{font-size:13px;letter-spacing:.03em;text-transform:uppercase;color:var(--tq-text)}
 .pedc .pmeta{font-size:13px;color:#2B302E;margin:0}
 .pedc .pnote{margin:0}
 .pedc.cero{background:#F6F7F7}
@@ -1209,67 +1211,82 @@ function fechaVisita(f){
 const ym=(y,m)=>y+'-'+String(m).padStart(2,'0');
 const uDe=(f,a)=>{ const p=(f.productos||[]).find(x=>x.art==a); return p? (p.u12!=null?p.u12:(p.u||0)) : 0; };
 
-// ---------- Pedidos (v1.23: equilibrar el acumulado del año contra 2025) ----------
-// Meta = lo que compró de enero al mes de la visita en el año anterior (× 1 / 1,02 / 1,04).
-// Pedido = meta − lo que ya compró en el año, con tope de 3 meses de su compra habitual (o lo del mismo mes del año pasado, si es mayor),
-// para no sobrecargar a la farmacia; lo que exceda el tope queda pendiente para las próximas visitas.
+// ---------- Pedidos (v1.32: "pedido del mes", siempre con meses cerrados) ----------
+// Compra habitual = promedio mensual de los últimos 12 meses cerrados (Venta Real, unidades de facturación).
+// Atraso = lo que compró de enero al último mes cerrado del año anterior × meta (1 / 1,02 / 1,04), menos lo mismo de este año.
+// Pedido sugerido = compra habitual × meta + atraso ÷ meses que quedan del año (contando el de la visita), con tope de 2 meses de compra habitual.
 const PED_OPTS=[{k:0,f:1,l:'Igual'},{k:2,f:1.02,l:'+2%'},{k:4,f:1.04,l:'+4%'}];
-const PED_TOPE_MESES=3;
+const PED_TOPE_MESES=2;
 let pedOpt = store.get('pedopt',0);
 let PED_ROWS=[];
+// Último mes cerrado según el corte de Venta Real (23/09/2026 → agosto 2026).
+function mesCerrado(){
+  const m=String(D.corte.venta_real).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(!m) { const u=MI[MI.length-1].split('-').map(Number); return {y:u[0], m:u[1]}; }
+  const dd=+m[1], mm=+m[2], yy=+m[3], fin=new Date(yy,mm,0).getDate();
+  return dd>=fin ? {y:yy,m:mm} : (mm===1?{y:yy-1,m:12}:{y:yy,m:mm-1});
+}
+const mes3=(m,y)=>MESL[m-1].slice(0,3)+'-'+String(y).slice(2);
 function calcPedido(f, factor){
-  const v=fechaVisita(f), m=v.m, last=MI.length-1;
+  const v=fechaVisita(f), c=mesCerrado(), Y=c.y, mc=c.m;
   const idx=(y,mm)=>MI.indexOf(ym(y,mm));
-  const i25=[], i26=[]; for(let k=1;k<=m;k++){ const a=idx(v.y-1,k), b=idx(v.y,k); if(a>=0) i25.push(a); if(b>=0) i26.push(b); }
-  const i12=[]; for(let i=Math.max(0,last-11);i<=last;i++) i12.push(i);
-  const iMes=idx(v.y-1,m);
-  const ult26 = i26.length ? MI[Math.max(...i26)] : null;
+  const i25=[], i26=[]; for(let k=1;k<=mc;k++){ const a=idx(Y-1,k), b=idx(Y,k); if(a>=0) i25.push(a); if(b>=0) i26.push(b); }
+  const ic=idx(Y,mc), i12=[]; for(let i=Math.max(0,ic-11);i<=ic;i++) i12.push(i);
+  const rest = v.y===Y ? Math.max(1, 12-Math.max(v.m,mc+1)+1) : Infinity;   // meses que quedan del año, contando el de la visita
   const rows=[];
   Object.entries(f.skum||{}).forEach(([a,arr])=>{
     const sum=ix=>Math.max(0, arr.filter(r=>ix.includes(r[0])).reduce((s,r)=>s+(r[1]||0),0));
-    const y25=sum(i25), y26=sum(i26); if(y25<=0&&y26<=0) return;
-    const u12=sum(i12), mes25=iMes>=0?sum([iMes]):0, prom=Math.max(u12/12, y25/Math.max(1,i25.length));
+    const y25=sum(i25), y26=sum(i26), u12=sum(i12);
+    if(y25<=0&&y26<=0&&u12<=0) return;
+    const hab = u12>0 ? u12/i12.length : y25/Math.max(1,i25.length);      // si dejó de comprar, su ritmo del año anterior
     const meta=Math.round(y25*factor), falta=Math.max(0,meta-y26);
-    const tope=Math.max(Math.ceil(PED_TOPE_MESES*prom), mes25);
-    const sug=Math.min(falta,tope), pend=falta-sug;
+    const base=hab*factor, crudo=base+(isFinite(rest)?falta/rest:0), tope=PED_TOPE_MESES*hab;
+    const sug=Math.round(Math.min(crudo,tope)), rec=Math.max(0, sug-Math.round(base));
     const lp=[...arr].filter(r=>r[1]>0&&r[3]>0).sort((x,y)=>y[0]-x[0])[0];
-    const estado = y25>0&&y26===0 ? 'dejo' : (y25===0 ? 'nuevo' : (falta===0 ? 'ok' : (pend>0 ? 'tope' : 'normal')));
-    rows.push({art:a, y25, y26, meta, falta, sug, pend, prom, tope, estado, precio: lp? lp[3]/lp[1] : null});
+    const estado = y25>0&&y26===0 ? 'dejo' : (crudo>tope+0.5 ? 'tope' : 'normal');
+    rows.push({art:a, y25, y26, meta, falta, hab, base, rec, sug, estado, var: y25>0?(y26/y25-1)*100:null, precio: lp? lp[3]/lp[1] : null});
   });
-  rows.sort((p,q)=>q.sug-p.sug||q.falta-p.falta||q.y25-p.y25);
-  return {v, m, i25, i26, ult26, rows};
+  rows.sort((p,q)=>q.sug-p.sug||q.hab-p.hab);
+  return {v, c, rest, i25, i26, i12, rows};
+}
+function facHTML(f){
+  const x=f.fac; if(!x||!x.n) return '';
+  const pm=x.n/12;
+  return `<div class="facref"><b>Cómo compra esta farmacia</b><span>${pm>=1?`Compra <b>${nf1.format(pm)} veces por mes</b>`:`Compra <b>${n0(x.n)} veces al año</b>`}; una compra típica lleva <b>${n0(x.u_med)} unid.</b> (≈ ${moneyC(x.imp_med)}).</span><span class="small">Productos OTC de Megalabs · Venta Real, ${esc(x.per)} (mediana por compra).</span></div>`;
 }
 function pedidos(f){
   if(f.sin_datos) return `<div class="empty">Sin compras registradas en Venta Real para armar un pedido.</div>`;
   if(!esFarmacia(f)) return pedidoCadena(f);
   const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
-  const C=calcPedido(f,o.f), mN=MESL[C.m-1], y=C.v.y;
-  const per25=C.m===1?`enero ${y-1}`:`enero–${mN} ${y-1}`, per25c=`ene–${mN.slice(0,3)} ${String(y-1).slice(2)}`;
-  const mu=C.ult26?MESL[+C.ult26.slice(5)-1]:null, per26c=C.ult26?`ene–${mu.slice(0,3)} ${String(y).slice(2)}`:'2026';
+  const C=calcPedido(f,o.f), c=C.c, Y=c.y, mN=MESL[C.v.m-1];
+  const p25=c.m===1?`enero ${Y-1}`:`enero–${MESL[c.m-1]} ${Y-1}`, p26=c.m===1?`enero ${Y}`:`enero–${MESL[c.m-1]} ${Y}`;
+  const p25c=`ene–${MESL[c.m-1].slice(0,3)} ${String(Y-1).slice(2)}`, p26c=`ene–${MESL[c.m-1].slice(0,3)} ${String(Y).slice(2)}`;
+  const p12=C.i12.length?`${mes3(+MI[C.i12[0]].slice(5),+MI[C.i12[0]].slice(0,4))} a ${mes3(c.m,Y)}`:'';
+  const restTxt=isFinite(C.rest)?(C.rest===1?`en ${MESL[11]}`:`entre los ${C.rest} meses que quedan del año (${MESL[12-C.rest].slice(0,3)}–dic)`):'';
   PED_ROWS=C.rows.filter(r=>r.sug>0);
-  const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.k?x.l:'Igual a '+(y-1)}</b>acumulado ${per25c}</button>`).join('');
+  const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.k?x.l:'Igual a '+(Y-1)}</b>vs. ${p25c}</button>`).join('');
   const inc=(f.pedido||[]).filter(q=>q.tipo==='incorporar').length;
-  const head=`<section class="sec"><div class="sec-h"><h2>Realizar pedido</h2><span class="src">Venta Real · unidades</span></div>
-    <span class="small" style="margin-top:-4px">Visita de ${mN} ${y}. Meta: lo que compró de ${per25}${o.k?` más un ${o.k}%`:''}. Se descuenta lo que ya compró en ${y} (Venta Real al ${D.corte.venta_real}). Las cantidades vienen precargadas según la meta elegida: podés cambiarlas con − y + o escribiendo el número.</span>
+  const head=`<section class="sec"><div class="sec-h"><h2>Realizar pedido</h2><span class="src">Venta Real · meses cerrados</span></div>
+    <span class="small" style="margin-top:-4px">Visita de ${mN} ${C.v.y}. Pedido del mes: su compra habitual de un mes (promedio ${p12})${o.k?` más un ${o.k}%`:''}, y una parte de lo que viene atrasado contra ${p25}, repartida ${restTxt}. Solo meses cerrados (Venta Real al ${D.corte.venta_real}). Las cantidades vienen precargadas: podés cambiarlas con − y + o escribiendo el número.</span>
     <div class="opt3" role="group" aria-label="Meta del pedido">${btns}</div>`;
-  if(!C.i25.length) return head+`<div class="empty">No hay datos de ${per25} para comparar.</div></section>`;
-  if(!C.rows.length) return head+`<div class="empty">No compró productos OTC de Megalabs ni en ${per25} ni en ${y}.</div></section>`;
+  if(!C.rows.length) return head+`<div class="empty">No compró productos OTC de Megalabs en los últimos 12 meses cerrados ni en ${p25}.</div>${facHTML(f)}</section>`;
   const T=k=>C.rows.reduce((s,r)=>s+r[k],0);
-  const tY25=T('y25'), tMeta=T('meta'), tY26=T('y26'), tFalta=T('falta'), tSug=T('sug'), tPend=T('pend');
-  const ok=C.rows.filter(r=>r.estado==='ok'||r.estado==='nuevo');
-  const nota=r=> r.estado==='dejo'?'<small>Lo compró en '+(y-1)+' y en '+y+' todavía no</small>'
-    : r.estado==='tope'?`<small>Tope: ${PED_TOPE_MESES} meses de su compra habitual · quedan ${n0(r.pend)} para próximas visitas</small>` : '';
-  const L=C.rows.filter(r=>r.sug>0);
+  const tY25=T('y25'), tMeta=T('meta'), tY26=T('y26'), tFalta=T('falta'), tHab=T('hab');
+  const nota=r=> r.estado==='dejo'?`Lo compró en ${p25c} y en ${Y} todavía no. `
+    : r.estado==='tope'?`Tope: ${PED_TOPE_MESES} meses de su compra habitual. ` : '';
+  const varH=r=> r.var==null?'':` · <span class="nw"><span class="${cls(r.var)}">${pct(r.var)}</span> vs. ${p25c}</span>`;
+  const L=PED_ROWS;
   return head+`
     <div class="ptot"><span id="pedTot">${pedTotHTML(f,o)}</span>
-      <span class="small num">${per25c}: ${n0(tY25)} unid.${o.k?` → meta ${n0(tMeta)}`:''} · ${per26c}: ${n0(tY26)} · faltan ${n0(tFalta)} en los productos atrasados${tPend?` · ${n0(tPend)} quedan para próximas visitas`:''}</span>${tY26>=tMeta?`<span class="small">En total ya superó la meta; el pedido equilibra los productos que vienen atrasados.</span>`:''}</div>
+      <span class="small num">Compra habitual: ${n0(tHab)} unid./mes · ${p25c}: ${n0(tY25)}${o.k?` → meta ${n0(tMeta)}`:''} · ${p26c}: ${n0(tY26)}${tFalta?` · atraso en los productos que vienen abajo: ${n0(tFalta)}`:''}</span>${tY26>=tMeta?`<span class="small">En total ya superó ${o.k?'la meta':p25c}: el pedido es su compra habitual de un mes, más lo atrasado de algunos productos.</span>`:''}</div>
+    ${facHTML(f)}
     ${L.length?`<div class="acc">${L.map(r=>{ const q=pedQ(f,o,r), nm=esc((P[r.art]||{n:r.art}).n);
       return `<div class="acc-i pedc${q?'':' cero'}" data-pedcard="${r.art}"><div class="t tq"><b>${nm}</b>${qselPed(r.art,q,nm)}</div>
-        <p class="pmeta num"><span class="nw">${per25c}: <b>${n0(r.y25)}</b></span> · <span class="nw">${per26c}: <b>${n0(r.y26)}</b></span> · <span class="nw">sugerido: <b>${n0(r.sug)}</b></span></p>
-        <p class="small pnote">${nota(r).replace(/<\/?small>/g,'')} <span data-pedx="${r.art}">${pedExtra(r.art,q,r.sug)}</span></p></div>`; }).join('')}</div>
-    <button class="back" id="pedReset" style="min-height:32px;padding:0;align-self:flex-start"${pedEdit(f,o)?'':' hidden'}>Volver a las cantidades sugeridas</button>`:`<div class="empty">En todos sus productos ya compró en ${y} lo mismo o más que en ${per25}${o.k?` ${o.l}`:''}: no hace falta equilibrar.</div>`}
-    ${ok.length?`<details><summary class="small">${ok.length} producto${ok.length===1?'':'s'} ya ${ok.length===1?'supera':'superan'} lo de ${y-1} (no hace falta pedir para equilibrar)</summary><div class="small" style="padding-top:6px">${ok.map(r=>esc((P[r.art]||{n:r.art}).n)+' ('+n0(r.y26)+' vs. '+n0(r.y25)+')').join(' · ')}</div></details>`:''}
-    <span class="small">Cómo se calcula: para cada producto, lo que compró de ${per25}${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, menos lo que ya compró en ${y}. Para no sobrecargar a la farmacia, cada producto tiene un tope de ${PED_TOPE_MESES} meses de su compra habitual (el promedio mensual más alto entre los últimos 12 meses y ${per25}) o lo que compró en ${mN} de ${y-1}, si es mayor. Compras posteriores al ${D.corte.venta_real} todavía no figuran. Valor aproximado con el precio neto de la última compra.</span>
+        <p class="pmeta num"><span class="nw">Compra habitual: <b>${n0(r.hab)}</b>/mes</span>${varH(r)}</p>
+        <p class="pmeta num"><span class="nw">Sugerido: <b>${n0(r.sug)}</b></span>${r.rec>0?` <span class="small">(incluye ${n0(r.rec)} del atraso)</span>`:''}</p>
+        <p class="small pnote"${nota(r)?' data-n="1"':''}${nota(r)||pedExtra(r.art,q,r.sug)?'':' hidden'}>${nota(r)} <span data-pedx="${r.art}">${pedExtra(r.art,q,r.sug)}</span></p></div>`; }).join('')}</div>
+    <button class="back" id="pedReset" style="min-height:32px;padding:0;align-self:flex-start"${pedEdit(f,o)?'':' hidden'}>Volver a las cantidades sugeridas</button>`:`<div class="empty">No hay productos para pedir.</div>`}
+    <span class="small">Cómo se calcula: para cada producto, su compra habitual de un mes (promedio de ${p12})${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, más lo que le falta para llegar a lo de ${p25}${o.k?` ${o.l}`:''} dividido ${isFinite(C.rest)?`entre ${C.rest} (meses que quedan del año)`:'(no aplica: el año ya cerró)'}. Tope: ${PED_TOPE_MESES} meses de su compra habitual. Solo se usan meses cerrados; las compras de ${MESL[c.m%12]} todavía no cuentan. Valor aproximado con el precio neto de la última compra.</span>
     ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Productos a Incorporar</button>.</span>`:''}
     ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">Enviar pedido</button><span class="small" id="copiado" aria-live="polite" style="align-self:center"></span></div>
     <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
@@ -1317,16 +1334,16 @@ function setPedQ(a,q){
   if(card){ card.classList.toggle('cero',!q);
     const i=card.querySelector('[data-pedi]'); if(i&&document.activeElement!==i) i.value=q;
     const mn=card.querySelector('[data-d="-1"]'); if(mn) mn.disabled=!q;
-    const x=card.querySelector('[data-pedx]'); if(x) x.innerHTML=pedExtra(r.art,q,r.sug); }
+    const x=card.querySelector('[data-pedx]'); if(x){ x.innerHTML=pedExtra(r.art,q,r.sug); x.parentNode.hidden=!x.innerHTML&&!x.parentNode.dataset.n; } }
   const t=$('#pedTot'); if(t) t.innerHTML=pedTotHTML(f,o);
   const rs=$('#pedReset'); if(rs) rs.hidden=!pedEdit(f,o);
   const c=$('#copiado'); if(c) c.textContent='';
 }
 function copiarPedido2(){
-  const f=cur, o=pedOptAct(), v=fechaVisita(f), mN=MESL[v.m-1];
+  const f=cur, o=pedOptAct();
   const L=PED_ROWS.map(r=>({r, q:pedQ(f,o,r)})).filter(x=>x.q>0);
   if(!L.length){ $('#copiado').textContent='El pedido no tiene cantidades.'; return; }
-  const txt=f.nombre+' — pedido (meta: enero–'+mN+' '+(v.y-1)+(o.k?' '+o.l:'')+')\n'+L.map(x=>'• '+P[x.r.art].n+' — '+x.q+' unid.').join('\n')+'\nTotal: '+L.reduce((s,x)=>s+x.q,0)+' unid. en '+L.length+' producto'+(L.length===1?'':'s');
+  const txt=f.nombre+' — pedido del mes'+(o.k?' ('+o.l+')':'')+'\n'+L.map(x=>'• '+P[x.r.art].n+' — '+x.q+' unid.').join('\n')+'\nTotal: '+L.reduce((s,x)=>s+x.q,0)+' unid. en '+L.length+' producto'+(L.length===1?'':'s');
   const ok=()=>{ $('#copiado').textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
   const fallback=()=>{ const t=$('#pedtxt'); t.hidden=false; t.value=txt; t.focus(); t.select(); $('#copiado').textContent='Seleccioná el texto y copialo.'; };
   try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
@@ -1936,7 +1953,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.31';
+const APP_VERSION='1.32';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
