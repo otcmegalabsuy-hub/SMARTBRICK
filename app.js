@@ -2035,6 +2035,80 @@ window.addEventListener('resize',()=>uxBarSync());
 @keyframes dotPulse{0%,100%{box-shadow:0 0 0 0 rgba(226,91,58,.45)}60%{box-shadow:0 0 0 6px rgba(226,91,58,0)}}
 `; document.head.appendChild(st); })();
 
+// ---- v1.37 · Cómo llegar: la ruta del día en Google Maps (todas las paradas en orden) y cada parada en Waze.
+// Mientras no haya direcciones en los datos, cada punto de venta se busca por nombre, barrio y departamento.
+// Si más adelante la ficha trae f.dir (dirección) o f.geo {lat, lon}, se usan esos datos y la ruta queda exacta.
+(function(){ const st=document.createElement('style'); st.textContent=`
+.navc .btn{text-decoration:none;align-self:flex-start}
+.navl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.navl li{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px 10px;padding:10px 12px;border:1px solid var(--hair);border-radius:var(--r-md,14px);background:#FAFCFC}
+.navl .rn{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--brand-soft);color:var(--tq-text);font-weight:800;font-size:13px}
+.navl .t{display:flex;flex-direction:column;min-width:0}
+.navl .t b{font-size:14.5px;line-height:1.25}
+.navl .ac{grid-column:2}
+details.navd summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--tq-text);min-height:34px}
+details.navd summary::-webkit-details-marker{display:none}
+details.navd summary::before{content:'';width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .2s;margin-right:2px}
+details.navd[open] summary::before{transform:rotate(45deg)}
+details.navd[open] .navl{margin-top:8px}
+.navl .t small{font-size:12.5px;color:var(--muted)}
+.navl .ac,.pnav,.rb-nav{display:flex;gap:6px;flex-wrap:wrap}
+.nb{display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:0 11px;border-radius:999px;border:1px solid var(--edge);background:#fff;color:var(--tq-text);font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap}
+.nb:active{transform:scale(.96)}
+.nb svg{flex-shrink:0}
+.pnav{margin-top:6px}
+.rb-nav{margin-top:6px;align-items:center}
+.rb-nav>span{font-size:12.5px;color:var(--muted);margin-right:2px}
+`; document.head.appendChild(st); })();
+
+const IPIN='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+const INAV='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"/></svg>';
+const IRUTA='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/></svg>';
+const navExacta=f=>!!(f&&(f.geo&&f.geo.lat!=null||f.dir));
+function navLugar(f){
+  if(f.geo&&f.geo.lat!=null&&f.geo.lon!=null) return {ll:f.geo.lat+','+f.geo.lon, q:f.geo.lat+','+f.geo.lon};
+  const dep=f.depto||zonaDepto(f.brick)||'';
+  if(f.dir) return {q:[f.dir, f.localidad||dep, 'Uruguay'].filter(Boolean).join(', ')};
+  let n=String(f.nombre).replace(/^FCIA\.?\s*/i,'Farmacia ').replace(/\s+/g,' ').trim();
+  if(f.tipo==='FARMASHOP') n='Farmashop'+(f.suc?' '+f.suc:'');
+  if(f.tipo==='SAN ROQUE') n='Farmacia San Roque';
+  const barrio=Z[f.brick]?zonaCorta(f.brick).split(/\s*-\s*/)[0]:'';
+  return {q:[n, barrio, dep, 'Uruguay'].filter(Boolean).join(', ')};
+}
+const gmUno=f=>'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(navLugar(f).q);
+const wzUno=f=>{ const g=navLugar(f); return 'https://waze.com/ul?'+(g.ll?'ll='+encodeURIComponent(g.ll):'q='+encodeURIComponent(g.q))+'&navigate=yes'; };
+// Google Maps acepta hasta 9 paradas intermedias: rutas de más de 10 puntos se dividen en tramos.
+function gmRuta(fs){
+  const T=[]; for(let i=0;i<fs.length;i+=10) T.push(fs.slice(i,i+10));
+  return T.map((t,k)=>{ const q=t.map(f=>navLugar(f).q), dest=q[q.length-1], wp=q.slice(0,-1);
+    return {desde:k*10+1, hasta:k*10+t.length, url:'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(dest)+(wp.length?'&waypoints='+encodeURIComponent(wp.join('|')):'')}; });
+}
+const navLinks=f=>`<a class="nb" href="${esc(wzUno(f))}" target="_blank" rel="noopener" aria-label="Ir con Waze a ${esc(f.nombre)}">${INAV}Waze</a><a class="nb" href="${esc(gmUno(f))}" target="_blank" rel="noopener" aria-label="Ir con Google Maps a ${esc(f.nombre)}">${IPIN}Maps</a>`;
+function navCard(fs){
+  const T=gmRuta(fs), todas=fs.every(navExacta);
+  return `<section class="sec navc"><div class="sec-h"><h2>Cómo llegar</h2><span class="src">Google Maps · Waze</span></div>
+    ${T.map(t=>`<a class="btn" href="${esc(t.url)}" target="_blank" rel="noopener">${IRUTA}${T.length>1?`Google Maps · paradas ${t.desde} a ${t.hasta}`:'Abrir la ruta en Google Maps'}</a>`).join('')}
+    <span class="small" style="margin-top:-4px">Sale desde donde estás y sigue el orden de las ${fs.length} paradas. Waze no acepta varias paradas: abrilas de a una abajo.</span>
+    <details class="navd"><summary>Parada por parada (Waze o Maps)</summary><ol class="navl">${fs.map((f,i)=>`<li><span class="rn">${i+1}</span><span class="t"><b>${esc(f.nombre)}</b><small>${Z[f.brick]?esc(zonaCorta(f.brick).split(/\s*-\s*/)[0])+' · ':''}${esc(f.depto||zonaDepto(f.brick)||'')}</small></span><span class="ac">${navLinks(f)}</span></li>`).join('')}</ol></details>
+    ${todas?'':`<span class="small">Las paradas se buscan por nombre y barrio: confirmá en el mapa que sea el local correcto antes de salir. Con las direcciones cargadas, la ruta queda exacta.</span>`}
+  </section>`;
+}
+// Resumen de la ruta: la tarjeta va debajo del encabezado.
+const _navRes=renderRutaRes;
+renderRutaRes=function(){
+  _navRes();
+  const R=RUTA_NAV, h=document.querySelector('#rres .rr-head'); if(!R||!h) return;
+  const fs=R.ids.map(fById).filter(Boolean); if(!fs.length) return;
+  h.insertAdjacentHTML('afterend', navCard(fs));
+};
+// Ficha: botones para llegar a esta farmacia (y, si se recorre una ruta, a la parada actual).
+const _navFarm=renderFarm;
+renderFarm=function(){
+  _navFarm();
+  const p=document.getElementById('pcard'); if(!p||!cur) return;
+  p.insertAdjacentHTML('beforeend', `<div class="pnav">${navLinks(cur)}</div>`);
+};
+
 // ================= Asistente: preguntas habladas o escritas =================
 const ASK={turns:[], busy:false, ctl:null, tools:false, mode:'', clickOnly:false, wasHold:false, discard:false, sr:null, srBlocked:false, recTxt:'', recStart:0, timer:null, holding:false};
 const MIC='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>';
@@ -2387,7 +2461,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.36';
+const APP_VERSION='1.37';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
