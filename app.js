@@ -1965,6 +1965,76 @@ function uxBarSync(){
 }
 window.addEventListener('resize',()=>uxBarSync());
 
+// ---- v1.36 · Pasada de diseño con criterios de "Taste Skill" (densidad aireada, un solo acento, tarjetas con sombra difusa
+// en lugar de bordes oscuros, tipografía de display con tracking ajustado, números tabulares, presión con resorte).
+// Se respeta la marca: turquesa de SmartBrick y logos sin cambios.
+(function(){ const st=document.createElement('style'); st.textContent=`
+:root{
+  --edge:rgba(16,48,46,.13); --hair:rgba(16,48,46,.09);
+  --r-lg:18px; --r-md:14px; --r-sm:11px;
+  --sh-1:0 1px 2px rgba(16,48,46,.05),0 10px 26px -12px rgba(16,48,46,.20);
+  --sh-2:0 2px 4px rgba(16,48,46,.06),0 22px 44px -18px rgba(16,48,46,.30);
+  --tq-grad:linear-gradient(160deg,#3EBDB6 0%,#2CA6A0 55%,#22968F 100%);
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --display:'Montserrat','Roboto',system-ui,sans-serif;
+}
+/* tipografía: display con tracking ajustado y números tabulares */
+.pcard h1,.hello h1,#s-menu h2,.sec-h h2,.uxw b,.rr-head h1,.cfg h3{font-family:var(--display);letter-spacing:-.02em}
+.pcard h1{font-size:30px;line-height:1.08}
+.hello h1{font-size:25px;line-height:1.12}
+#hola small.hfecha{font-family:'Roboto',system-ui,sans-serif;margin-top:8px;font-size:14px;letter-spacing:.01em}
+#s-menu h2{font-size:19px}
+.sec-h h2{font-size:17px}
+.num,.kpi .v,.zval .v,.ptot b,.qsel input,.obar b,td.num{font-variant-numeric:tabular-nums}
+.kpi .v,.zval .v{font-family:var(--display);font-weight:700;letter-spacing:-.025em}
+.kpi .l,.zbox .l{font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-size:28px;line-height:1.15;margin-top:2px}
+/* tarjetas: sombra difusa y borde de un pelo, sin contornos oscuros */
+.pcard,.kpi,.sec,.rr-head,.rr-card{border:1px solid var(--hair);border-radius:var(--r-lg);box-shadow:var(--sh-1);background:rgba(255,255,255,.96)}
+.kpi{padding:12px 14px}
+.sec{padding:16px;gap:14px}
+.pcard{padding:16px 18px;gap:6px;background:linear-gradient(135deg,rgba(255,255,255,.98) 0%,rgba(238,248,247,.96) 100%)}
+.ptag{border:0;border-radius:999px;background:var(--brand-soft);color:var(--tq-text);font-weight:700;font-size:11.5px;padding:3px 10px;letter-spacing:.06em}
+#tabs.tabs{border-radius:var(--r-lg);box-shadow:var(--sh-1)}
+.tgrp .tab{border-radius:var(--r-sm)}
+.tgrp .tab[aria-selected="true"]{animation:tPop .32s var(--spring)}
+/* dentro de una sección, los bloques van planos (sin tarjeta dentro de tarjeta) */
+.sec .zbox,.sec .acc-i,.sec .kpi{box-shadow:none;border:1px solid var(--hair);border-radius:var(--r-md);background:#FAFCFC}
+.sec .acc-i.sel{background:var(--brand-soft);border-color:rgba(55,180,174,.55)}
+.pedc.cero{background:#F4F6F6}
+.ptot,.inc-tot{border-radius:var(--r-md);background:linear-gradient(135deg,#F2FAF9,#EAF6F5)}
+.facref{border-radius:var(--r-md)}
+.empty{border-radius:var(--r-md)}
+.rr-z{border-radius:var(--r-md);border-color:var(--hair)}
+/* botones */
+.btn{border-radius:12px}
+.btn:not(.sec2){background:var(--tq-grad);box-shadow:0 10px 20px -10px rgba(34,150,143,.75),inset 0 1px 0 rgba(255,255,255,.22)}
+.btn.sec2{border:1px solid var(--edge);box-shadow:0 1px 2px rgba(16,48,46,.06)}
+.btn.ok{background:#1F8A84}
+.cta{border-radius:16px;background:var(--tq-grad);box-shadow:0 14px 28px -14px rgba(34,150,143,.85),inset 0 1px 0 rgba(255,255,255,.25)}
+.btn-login{border-radius:12px;background:var(--tq-grad);box-shadow:0 10px 22px -10px rgba(34,150,143,.8),inset 0 1px 0 rgba(255,255,255,.22)}
+.lcard{border-radius:20px;box-shadow:var(--sh-2);border:1px solid var(--hair)}
+.opt3 button{border-radius:12px;border-color:var(--edge)}
+.opt3 button[aria-pressed="true"]{box-shadow:0 0 0 3px rgba(55,180,174,.18);animation:tPop .32s var(--spring)}
+.qsel{border-radius:12px}
+.urec-c{border-radius:var(--r-md);border-color:var(--hair);box-shadow:var(--sh-1)}
+/* inicio: tarjetas de modo con ícono en círculo y panel de configuración con relieve */
+.mode{border-radius:20px;border:1px solid var(--hair);box-shadow:var(--sh-1);background:rgba(255,255,255,.96);gap:12px}
+.mode svg{box-sizing:content-box;padding:12px;border-radius:18px;background:var(--brand-soft);color:var(--tq-text);transition:transform .35s var(--spring),background-color .2s}
+.mode[aria-pressed="true"]{background:var(--tq-grad);border:1px solid rgba(255,255,255,.35);box-shadow:0 18px 32px -16px rgba(34,150,143,.85),inset 0 1px 0 rgba(255,255,255,.28)}
+.mode[aria-pressed="true"] svg{background:rgba(255,255,255,.2);color:#fff;transform:scale(1.06)}
+.cfg{border-radius:22px;background:var(--tq-grad);box-shadow:0 22px 40px -20px rgba(20,110,104,.75),inset 0 1px 0 rgba(255,255,255,.25)}
+.cfg select,.cfg input{border-radius:12px;border-color:rgba(255,255,255,.6)}
+.green{border-radius:var(--r-lg);background:var(--tq-grad);box-shadow:0 18px 34px -18px rgba(20,110,104,.7),inset 0 1px 0 rgba(255,255,255,.22)}
+/* detalles vivos (movimiento sutil y continuo, sólo en elementos chicos) */
+@media (prefers-reduced-motion:no-preference){
+  .urec-c i{animation:dotPulse 2.4s ease-in-out infinite}
+  .mode:active svg{transform:scale(.92)}
+}
+@keyframes tPop{0%{transform:scale(.94)}100%{transform:none}}
+@keyframes dotPulse{0%,100%{box-shadow:0 0 0 0 rgba(226,91,58,.45)}60%{box-shadow:0 0 0 6px rgba(226,91,58,0)}}
+`; document.head.appendChild(st); })();
+
 // ================= Asistente: preguntas habladas o escritas =================
 const ASK={turns:[], busy:false, ctl:null, tools:false, mode:'', clickOnly:false, wasHold:false, discard:false, sr:null, srBlocked:false, recTxt:'', recStart:0, timer:null, holding:false};
 const MIC='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>';
@@ -2317,7 +2387,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.35';
+const APP_VERSION='1.36';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
