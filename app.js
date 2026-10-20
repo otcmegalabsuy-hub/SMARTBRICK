@@ -1288,7 +1288,7 @@ function pedidos(f){
     <button class="back" id="pedReset" style="min-height:32px;padding:0;align-self:flex-start"${pedEdit(f,o)?'':' hidden'}>Volver a las cantidades sugeridas</button>`:`<div class="empty">No hay productos para pedir.</div>`}
     <span class="small">Cómo se calcula: para cada producto, su compra habitual de un mes (promedio de ${p12})${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, más lo que le falta para llegar a lo de ${p25}${o.k?` ${o.l}`:''} dividido ${isFinite(C.rest)?`entre ${C.rest} (meses que quedan del año)`:'(no aplica: el año ya cerró)'}. Tope: ${PED_TOPE_MESES} meses de su compra habitual. Solo se usan meses cerrados; las compras de ${MESL[c.m%12]} todavía no cuentan. Valor aproximado con el precio neto de la última compra.</span>
     ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Productos a Incorporar</button>.</span>`:''}
-    ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">Enviar pedido</button><span class="small" id="copiado" aria-live="polite" style="align-self:center"></span></div>
+    ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">${IXL}Enviar pedido (Excel)</button><button class="btn sec2" id="copiarPT">Copiar como texto</button><span class="small" id="copiado" aria-live="polite" style="align-self:center;flex-basis:100%"></span></div>
     <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
   </section>`;
 }
@@ -1339,16 +1339,6 @@ function setPedQ(a,q){
   const rs=$('#pedReset'); if(rs) rs.hidden=!pedEdit(f,o);
   const c=$('#copiado'); if(c) c.textContent='';
 }
-function copiarPedido2(){
-  const f=cur, o=pedOptAct();
-  const L=PED_ROWS.map(r=>({r, q:pedQ(f,o,r)})).filter(x=>x.q>0);
-  if(!L.length){ $('#copiado').textContent='El pedido no tiene cantidades.'; return; }
-  const txt=f.nombre+' — pedido del mes'+(o.k?' ('+o.l+')':'')+'\n'+L.map(x=>'• '+P[x.r.art].n+' — '+x.q+' unid.').join('\n')+'\nTotal: '+L.reduce((s,x)=>s+x.q,0)+' unid. en '+L.length+' producto'+(L.length===1?'':'s');
-  const ok=()=>{ $('#copiado').textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
-  const fallback=()=>{ const t=$('#pedtxt'); t.hidden=false; t.value=txt; t.focus(); t.select(); $('#copiado').textContent='Seleccioná el texto y copialo.'; };
-  try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
-}
-
 // ---------- Stock Mega (v1.29): stock en los depósitos de Megalabs (dentro de los datos cifrados) ----------
 const SM=()=>D.stock_mega||null;
 const smU=a=>{ const s=SM(); return s&&s.u&&s.u[a]!=null ? s.u[a] : null; };
@@ -1486,7 +1476,7 @@ function desvioBrick(f){
       <p>Se venden <b>${n0(x.zu)} unid./año</b> en el brick (${nf1.format(x.z*100)}% de las unidades de Megalabs).${x.exp!=null&&x.exp>=1?` Si se vendiera acá como en el brick: ~${n0(x.exp)} unid. ${per}.`:''}</p>
       <p class="small" style="margin:0">${estado(x)}${smLinea(x.a,Q[x.a])}</p></div>`).join('')}</div>
     <div class="inc-tot" id="incTot" aria-live="polite">${incTotHTML(f)}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="enviarInc">Enviar pedido</button><span class="small" id="copiadoI" aria-live="polite" style="align-self:center"></span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="enviarInc">${IXL}Enviar pedido (Excel)</button><button class="btn sec2" id="enviarIncT">Copiar como texto</button><span class="small" id="copiadoI" aria-live="polite" style="align-self:center;flex-basis:100%"></span></div>
     <textarea id="pedtxtI" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`
       :`<div class="empty">${esF?'Esta farmacia ya compra':'Esta sucursal ya vende'} todos los productos de Megalabs que se venden en su brick.</div>`}
   </section>`;
@@ -1511,21 +1501,96 @@ function setIncQ(a, q){
   const t=$('#incTot'); if(t) t.innerHTML=incTotHTML(f);
   const c=$('#copiadoI'); if(c) c.textContent='';
 }
-function enviarInc(){
-  const f=cur, S=incSel(f);
-  if(!S.length){ $('#copiadoI').textContent='Elegí la cantidad de al menos un producto.'; return; }
-  const txt=f.nombre+' — productos a incorporar\n'+S.map(x=>'• '+P[x.a].n+' — '+x.q+' unid.').join('\n')+'\nTotal: '+S.reduce((s,x)=>s+x.q,0)+' unid. en '+S.length+' producto'+(S.length===1?'':'s');
-  const ok=()=>{ $('#copiadoI').textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
-  const fallback=()=>{ const t=$('#pedtxtI'); t.hidden=false; t.value=txt; t.focus(); t.select(); $('#copiadoI').textContent='Seleccioná el texto y copialo.'; };
+// ---------- v1.33 · Exportar el pedido: Excel (.xlsx) con código de producto, o texto ----------
+const IXL='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M3 15h18M9 9v12"/></svg>';
+function pedidoActual(kind){
+  const f=cur;
+  if(kind==='inc') return {f, tipo:'Productos a incorporar', items:incSel(f).map(x=>({a:String(x.a), q:x.q})), st:'#copiadoI', ta:'#pedtxtI', vacio:'Elegí la cantidad de al menos un producto.'};
+  const o=pedOptAct();
+  return {f, tipo:'Pedido del mes'+(o.k?' ('+o.l+')':''), items:PED_ROWS.map(r=>({a:String(r.art), q:pedQ(f,o,r)})).filter(x=>x.q>0), st:'#copiado', ta:'#pedtxt', vacio:'El pedido no tiene cantidades.'};
+}
+const codCli=f=>String(f.id).split('|')[1]||'';
+const fechaDMY=iso=>iso.split('-').reverse().join('/');
+// Texto (WhatsApp): una línea por producto con su código.
+function pedidoTexto(X){
+  const f=X.f, t=X.items.reduce((s,x)=>s+x.q,0);
+  return `${f.nombre} (${esFarmacia(f)?'cliente':'sucursal'} ${codCli(f)}) — ${X.tipo.toLowerCase()}\n`+X.items.map(x=>`• ${x.a} · ${P[x.a].n} — ${x.q} unid.`).join('\n')+`\nTotal: ${t} unid. en ${X.items.length} producto${X.items.length===1?'':'s'}`;
+}
+function copiarTexto(kind){
+  const X=pedidoActual(kind); if(!X.items.length){ $(X.st).textContent=X.vacio; return; }
+  const txt=pedidoTexto(X);
+  const ok=()=>{ $(X.st).textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
+  const fallback=()=>{ const t=$(X.ta); t.hidden=false; t.value=txt; t.focus(); t.select(); $(X.st).textContent='Seleccioná el texto y copialo.'; };
   try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
+}
+// .xlsx mínimo hecho a mano (zip sin compresión): sin librerías externas, funciona sin señal.
+const CRC_T=(()=>{ const T=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; T[n]=c>>>0; } return T; })();
+const crc32=u=>{ let c=0xFFFFFFFF; for(let i=0;i<u.length;i++) c=CRC_T[(c^u[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; };
+function zipStore(files){
+  const enc=new TextEncoder(), d=new Date(), tm=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1), dt=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  const parts=[], cen=[]; let off=0;
+  const h=(n,arr)=>{ const b=new DataView(new ArrayBuffer(n)); arr.forEach(([o,v,s])=>s===2?b.setUint16(o,v,true):b.setUint32(o,v,true)); return new Uint8Array(b.buffer); };
+  files.forEach(([name,txt])=>{
+    const nm=enc.encode(name), data=enc.encode(txt), c=crc32(data);
+    const loc=h(30,[[0,0x04034b50,4],[4,20,2],[6,0,2],[8,0,2],[10,tm,2],[12,dt,2],[14,c,4],[18,data.length,4],[22,data.length,4],[26,nm.length,2],[28,0,2]]);
+    parts.push(loc,nm,data);
+    cen.push(h(46,[[0,0x02014b50,4],[4,20,2],[6,20,2],[8,0,2],[10,0,2],[12,tm,2],[14,dt,2],[16,c,4],[20,data.length,4],[24,data.length,4],[28,nm.length,2],[30,0,2],[32,0,2],[34,0,2],[36,0,2],[38,0,4],[42,off,4]]),nm);
+    off+=loc.length+nm.length+data.length;
+  });
+  const cs=cen.reduce((s,u)=>s+u.length,0);
+  return [...parts,...cen,h(22,[[0,0x06054b50,4],[4,0,2],[6,0,2],[8,files.length,2],[10,files.length,2],[12,cs,4],[16,off,4],[20,0,2]])];
+}
+function xlsxBlob(rows, widths, hoja){
+  const X=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const col=i=>{ let s=''; for(i++;i;i=Math.floor((i-1)/26)) s=String.fromCharCode(65+(i-1)%26)+s; return s; };
+  const cel=(c,r,i)=>{ if(c==null||c==='') return ''; const o=typeof c==='object'?c:{v:c}, ref=col(i)+(r+1), st=o.s?` s="${o.s}"`:'';
+    return typeof o.v==='number'?`<c r="${ref}"${st}><v>${o.v}</v></c>`:`<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${X(o.v)}</t></is></c>`; };
+  const NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', RN='xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"', HD='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const sheet=`${HD}<worksheet ${NS}><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rows.map((R,r)=>`<row r="${r+1}">${R.map((c,i)=>cel(c,r,i)).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  const styles=`${HD}<styleSheet ${NS}><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF0A7B73"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFA6DCD7"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF0A7B73"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="3" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="left"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const files=[
+    ['[Content_Types].xml',`${HD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
+    ['_rels/.rels',`${HD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml',`${HD}<workbook ${NS} ${RN}><sheets><sheet name="${X(hoja)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+    ['xl/_rels/workbook.xml.rels',`${HD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/worksheets/sheet1.xml',sheet],
+    ['xl/styles.xml',styles]];
+  return new Blob(zipStore(files),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function pedidoExcel(kind){
+  const X=pedidoActual(kind); if(!X.items.length){ $(X.st).textContent=X.vacio; return; }
+  const f=X.f, fv=fechaVisita(f).iso, t=X.items.reduce((s,x)=>s+x.q,0), num=v=>isNaN(+v)||v===''?v:{v:+v,s:6};
+  const rows=[[{v:'Pedido · SmartBrick',s:5}],
+    [{v:'Punto de venta',s:1},f.nombre],
+    [{v:esFarmacia(f)?'Código de cliente':'Sucursal',s:1},num(codCli(f))],
+    [{v:'Tipo',s:1},X.tipo],
+    [{v:'Fecha de visita',s:1},fechaDMY(fv)],
+    [{v:'Vendedor',s:1},D.vendedor||''],
+    [],
+    [{v:'Código',s:2},{v:'Producto',s:2},{v:'Unidades',s:2}],
+    ...X.items.map(x=>[num(x.a), P[x.a].n, {v:x.q,s:3}]),
+    [{v:'Total',s:1},{v:`${X.items.length} producto${X.items.length===1?'':'s'}`,s:1},{v:t,s:4}]];
+  const blob=xlsxBlob(rows,[18,46,12],'Pedido');
+  const name=`${kind==='inc'?'Incorporar':'Pedido'}_${f.nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'')}_${fv}.xlsx`;
+  const st=$(X.st);
+  const bajar=()=>{ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); st.textContent='Se descargó '+name+'.'; };
+  let file=null; try{ file=new File([blob],name,{type:blob.type}); }catch(e){}
+  const movil=window.matchMedia&&matchMedia('(pointer:coarse)').matches;
+  if(file&&movil&&navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:name, text:`${f.nombre} — ${X.tipo.toLowerCase()}`})
+      .then(()=>{ st.textContent='Listo: se compartió el Excel del pedido.'; })
+      .catch(e=>{ if(e&&e.name==='AbortError') st.textContent=''; else bajar(); });
+  } else bajar();
 }
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-pedopt]'); if(b){ pedOpt=+b.dataset.pedopt; store.set('pedopt',pedOpt); renderFarmTab(); return; }
-  if(e.target.closest('#copiarP')) copiarPedido2();
+  if(e.target.closest('#copiarP')) pedidoExcel('ped');
+  if(e.target.closest('#copiarPT')) copiarTexto('ped');
   const pq=e.target.closest('[data-pedq]'); if(pq){ const r=PED_ROWS.find(x=>String(x.art)===pq.dataset.pedq); if(r) setPedQ(r.art, pedQ(cur,pedOptAct(),r)+(+pq.dataset.d)); return; }
   if(e.target.closest('#pedReset')){ delete PED_Q[pedKey(cur,pedOptAct())]; renderFarmTab(); return; }
   const q=e.target.closest('[data-incq]'); if(q){ const a=q.dataset.incq; setIncQ(a, (incQ(cur)[a]||0)+(+q.dataset.d)); return; }
-  if(e.target.closest('#enviarInc')) enviarInc();
+  if(e.target.closest('#enviarInc')) pedidoExcel('inc');
+  if(e.target.closest('#enviarIncT')) copiarTexto('inc');
 });
 document.addEventListener('input',e=>{ const i=e.target.closest&&e.target.closest('[data-inci]'); if(i) setIncQ(i.dataset.inci, i.value);
   const pi=e.target.closest&&e.target.closest('[data-pedi]'); if(pi&&pi.value!=='') setPedQ(pi.dataset.pedi, pi.value); });
@@ -1953,7 +2018,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.32';
+const APP_VERSION='1.33';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
