@@ -2109,6 +2109,87 @@ renderFarm=function(){
   p.insertAdjacentHTML('beforeend', `<div class="pnav">${navLinks(cur)}</div>`);
 };
 
+// ---- v1.38 · Inicio renovado: encabezado con fondo dinámico ("aurora" turquesa muy lenta, sin distraer),
+// saludo grande y tres accesos con datos de la cartera (ruta de hoy, farmacias, alertas altas).
+// No cambia ninguna función: solo reubica el logo y el saludo dentro del encabezado y le agrega los accesos.
+(function(){ const st=document.createElement('style'); st.textContent=`
+#s-menu .uhero{position:relative;isolation:isolate;overflow:hidden;border-radius:0 0 30px 30px;background:linear-gradient(180deg,#F4FBFA 0%,#E2F4F2 100%);box-shadow:0 22px 44px -30px rgba(20,110,104,.55),inset 0 -1px 0 rgba(55,180,174,.18);padding-bottom:18px}
+#s-menu .uhero .hdr-c{background:transparent;box-shadow:none;padding:14px 16px 2px;display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:560px;margin:0 auto;box-sizing:border-box}
+#s-menu .uhero .hdr-c img{height:40px}
+#s-menu .uhero .hello .wrap{flex-wrap:wrap;row-gap:4px;align-items:center}
+#s-menu .uhero #hola{flex:1 1 100%}
+#hFecha{flex:1;min-width:0;font-size:14.5px;font-weight:500;color:var(--muted)}
+#s-menu .uhero .hello{background:transparent;padding-block:10px 4px}
+#s-menu .uhero .hello h1{font-size:28px;line-height:1.1}
+#s-menu .uhero .logout{background:rgba(255,255,255,.7);border-color:rgba(16,48,46,.12)}
+#s-menu .uhero .hello{padding-block:12px 2px}
+.aur{position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.aur i{position:absolute;display:block;border-radius:50%;will-change:transform}
+.aur i:nth-child(1){width:115%;height:150%;left:-35%;top:-55%;background:radial-gradient(closest-side,rgba(55,180,174,.34),rgba(55,180,174,0))}
+.aur i:nth-child(2){width:95%;height:130%;right:-40%;top:-25%;background:radial-gradient(closest-side,rgba(127,216,209,.42),rgba(127,216,209,0))}
+.aur i:nth-child(3){width:90%;height:120%;left:15%;bottom:-75%;background:radial-gradient(closest-side,rgba(166,220,215,.55),rgba(166,220,215,0))}
+.aur b{position:absolute;inset:0;background-image:radial-gradient(rgba(10,123,115,.13) 1px,transparent 1.4px);background-size:18px 18px;-webkit-mask-image:linear-gradient(115deg,rgba(0,0,0,.9),rgba(0,0,0,0) 62%);mask-image:linear-gradient(115deg,rgba(0,0,0,.9),rgba(0,0,0,0) 62%)}
+@media (prefers-reduced-motion:no-preference){
+  .aur i:nth-child(1){animation:aur1 28s ease-in-out infinite alternate}
+  .aur i:nth-child(2){animation:aur2 34s ease-in-out infinite alternate}
+  .aur i:nth-child(3){animation:aur3 40s ease-in-out infinite alternate}
+  .aur b{animation:aurDots 60s linear infinite}
+  .hstats .hs{animation:uxUp .55s var(--ease-out) both}
+  .hstats .hs:nth-child(2){animation-delay:.07s}.hstats .hs:nth-child(3){animation-delay:.14s}
+}
+@keyframes aur1{to{transform:translate3d(22%,14%,0) scale(1.15)}}
+@keyframes aur2{to{transform:translate3d(-26%,18%,0) scale(.88)}}
+@keyframes aur3{to{transform:translate3d(18%,-22%,0) scale(1.12)}}
+@keyframes aurDots{to{background-position:180px 90px}}
+.hstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.hstats .hs{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:68px;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.66);border:1px solid rgba(255,255,255,.9);box-shadow:0 8px 20px -14px rgba(16,48,46,.45),inset 0 1px 0 rgba(255,255,255,.9);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);text-align:left;color:var(--ink);font:inherit;min-width:0}
+.hstats .hs b{font-family:var(--display,'Montserrat',sans-serif);font-size:24px;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.hstats .hs span{font-size:12px;line-height:1.25;color:var(--muted);font-weight:500}
+.hstats .hs.al b{color:#C2410C}
+.hstats button.hs{cursor:pointer}
+.hstats button.hs span{color:var(--tq-text);font-weight:700}
+#s-menu .wrap.menu{padding-top:6px}
+`; document.head.appendChild(st); })();
+
+// Encabezado: el logo y el saludo pasan a un bloque con el fondo dinámico.
+(function(){
+  const m=document.getElementById('s-menu'); if(!m) return;
+  const hc=m.querySelector(':scope > .hdr-c'), he=m.querySelector(':scope > .hello'); if(!hc||!he) return;
+  const box=document.createElement('div'); box.className='uhero';
+  box.innerHTML='<div class="aur" aria-hidden="true"><i></i><i></i><i></i><b></b></div>';
+  m.insertBefore(box, hc); box.appendChild(hc); box.appendChild(he);
+  const s=document.createElement('div'); s.className='hstats wrap'; s.id='hStats'; s.style.display='grid'; he.after(s);
+})();
+function hoyStats(){
+  const s=document.getElementById('hStats'); if(!s||!F) return;
+  const hoy=isoHoy(), ruta=rutaGet(hoy), al=F.filter(f=>(f.alertas||[]).some(a=>a.nivel==='alta')).length;
+  s.innerHTML = (ruta.length
+      ? `<button type="button" class="hs" data-hs="ruta"><b class="num">${ruta.length}</b><span>paradas en tu ruta de hoy ›</span></button>`
+      : `<button type="button" class="hs" data-hs="armar"><b>+</b><span>Armar la ruta de hoy ›</span></button>`)
+    + `<div class="hs"><b class="num">${F.length}</b><span>farmacias en tu cartera</span></div>`
+    + `<div class="hs al"><b class="num">${al}</b><span>con alertas altas</span></div>`;
+  s.querySelectorAll('b.num').forEach(b=>uxCount(b));
+}
+// La fecha va en la fila de Preguntar y Salir; el saludo usa todo el ancho.
+// (Esos botones quedan más abajo que la barra del lector de voz, que aparece arriba de todo.)
+const _hoyInit=initMenuData;
+initMenuData=function(){
+  _hoyInit();
+  const h=$('#hola'), sm=h&&h.querySelector('small.hfecha'), nb=document.querySelector('#s-menu .hello .navbtns'); if(!sm||!nb) return;
+  let fe=document.getElementById('hFecha'); if(!fe){ fe=document.createElement('span'); fe.id='hFecha'; nb.parentNode.insertBefore(fe,nb); }
+  fe.textContent=sm.textContent; sm.remove();
+};
+const _hoyMenu=renderMenu;
+renderMenu=function(){ _hoyMenu(); hoyStats(); };
+document.addEventListener('click',e=>{
+  const b=e.target.closest('#hStats [data-hs]'); if(!b) return;
+  const hoy=isoHoy();
+  if(b.dataset.hs==='ruta'){ const ids=rutaGet(hoy); if(!ids.length) return; RUTA_NAV={fecha:hoy, ids, idx:0}; show('ruta'); renderRutaRes(); return; }
+  const md=document.querySelector('.mode[data-mode="ruta"]'); if(md) md.click();
+  setTimeout(()=>{ const d=document.querySelector(`.cal-d[data-f="${hoy}"]`); if(d&&d.getAttribute('aria-pressed')!=='true') d.click();
+    const c=document.getElementById('cfg'); if(c) c.scrollIntoView({behavior:UX_RM?'auto':'smooth', block:'start'}); },60);
+});
+
 // ================= Asistente: preguntas habladas o escritas =================
 const ASK={turns:[], busy:false, ctl:null, tools:false, mode:'', clickOnly:false, wasHold:false, discard:false, sr:null, srBlocked:false, recTxt:'', recStart:0, timer:null, holding:false};
 const MIC='<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>';
@@ -2461,7 +2542,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.37';
+const APP_VERSION='1.38';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
