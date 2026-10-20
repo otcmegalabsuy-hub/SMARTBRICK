@@ -1267,7 +1267,7 @@ function pedidos(f){
   const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.k?x.l:'Igual a '+(Y-1)}</b>vs. ${p25c}</button>`).join('');
   const inc=(f.pedido||[]).filter(q=>q.tipo==='incorporar').length;
   const head=`<section class="sec"><div class="sec-h"><h2>Realizar pedido</h2><span class="src">Venta Real · meses cerrados</span></div>
-    <span class="small" style="margin-top:-4px">Visita de ${mN} ${C.v.y}. Pedido del mes: su compra habitual de un mes (promedio ${p12})${o.k?` más un ${o.k}%`:''}, y una parte de lo que viene atrasado contra ${p25}, repartida ${restTxt}. Solo meses cerrados (Venta Real al ${D.corte.venta_real}). Las cantidades vienen precargadas: podés cambiarlas con − y + o escribiendo el número.</span>
+    <span class="small" style="margin-top:-4px">Visita de ${mN} ${C.v.y} · su compra habitual de un mes${o.k?` +${o.k}%`:''} más una parte de lo atrasado. Las cantidades vienen precargadas: ajustalas con − y +.</span>
     <div class="opt3" role="group" aria-label="Meta del pedido">${btns}</div>`;
   if(!C.rows.length) return head+`<div class="empty">No compró productos OTC de Megalabs en los últimos 12 meses cerrados ni en ${p25}.</div>${facHTML(f)}</section>`;
   const T=k=>C.rows.reduce((s,r)=>s+r[k],0);
@@ -1286,7 +1286,7 @@ function pedidos(f){
         <p class="pmeta num"><span class="nw">Sugerido: <b>${n0(r.sug)}</b></span>${r.rec>0?` <span class="small">(incluye ${n0(r.rec)} del atraso)</span>`:''}</p>
         <p class="small pnote"${nota(r)?' data-n="1"':''}${nota(r)||pedExtra(r.art,q,r.sug)?'':' hidden'}>${nota(r)} <span data-pedx="${r.art}">${pedExtra(r.art,q,r.sug)}</span></p></div>`; }).join('')}</div>
     <button class="back" id="pedReset" style="min-height:32px;padding:0;align-self:flex-start"${pedEdit(f,o)?'':' hidden'}>Volver a las cantidades sugeridas</button>`:`<div class="empty">No hay productos para pedir.</div>`}
-    <span class="small">Cómo se calcula: para cada producto, su compra habitual de un mes (promedio de ${p12})${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, más lo que le falta para llegar a lo de ${p25}${o.k?` ${o.l}`:''} dividido ${isFinite(C.rest)?`entre ${C.rest} (meses que quedan del año)`:'(no aplica: el año ya cerró)'}. Tope: ${PED_TOPE_MESES} meses de su compra habitual. Solo se usan meses cerrados; las compras de ${MESL[c.m%12]} todavía no cuentan. Valor aproximado con el precio neto de la última compra.</span>
+    <details class="uinfo"><summary>¿Cómo se calcula?</summary><p>Visita de ${mN} ${C.v.y}. Pedido del mes: su compra habitual de un mes (promedio ${p12})${o.k?` más un ${o.k}%`:''}, y una parte de lo que viene atrasado contra ${p25}, repartida ${restTxt}. Solo meses cerrados (Venta Real al ${D.corte.venta_real}). Las cantidades vienen precargadas: podés cambiarlas con − y + o escribiendo el número.</p><p>Cómo se calcula: para cada producto, su compra habitual de un mes (promedio de ${p12})${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''}, más lo que le falta para llegar a lo de ${p25}${o.k?` ${o.l}`:''} dividido ${isFinite(C.rest)?`entre ${C.rest} (meses que quedan del año)`:'(no aplica: el año ya cerró)'}. Tope: ${PED_TOPE_MESES} meses de su compra habitual. Solo se usan meses cerrados; las compras de ${MESL[c.m%12]} todavía no cuentan. Valor aproximado con el precio neto de la última compra.</p></details>
     ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y no compra: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Productos a Incorporar</button>.</span>`:''}
     ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">${IXL}Enviar pedido (Excel)</button><button class="btn sec2" id="copiarPT">Copiar como texto</button><span class="small" id="copiado" aria-live="polite" style="align-self:center;flex-basis:100%"></span></div>
     <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
@@ -1332,12 +1332,13 @@ function setPedQ(a,q){
   if(q===r.sug) delete m[r.art]; else m[r.art]=q;
   const card=document.querySelector(`[data-pedcard="${r.art}"]`);
   if(card){ card.classList.toggle('cero',!q);
-    const i=card.querySelector('[data-pedi]'); if(i&&document.activeElement!==i) i.value=q;
+    const i=card.querySelector('[data-pedi]'); if(i&&document.activeElement!==i){ i.value=q; uxBump(i); uxVib(8); }
     const mn=card.querySelector('[data-d="-1"]'); if(mn) mn.disabled=!q;
     const x=card.querySelector('[data-pedx]'); if(x){ x.innerHTML=pedExtra(r.art,q,r.sug); x.parentNode.hidden=!x.innerHTML&&!x.parentNode.dataset.n; } }
-  const t=$('#pedTot'); if(t) t.innerHTML=pedTotHTML(f,o);
+  const t=$('#pedTot'); if(t){ const old=uxNum(t.querySelector('b')); t.innerHTML=pedTotHTML(f,o); uxCount(t.querySelector('b'),old); }
   const rs=$('#pedReset'); if(rs) rs.hidden=!pedEdit(f,o);
   const c=$('#copiado'); if(c) c.textContent='';
+  uxBarSync();
 }
 // ---------- Stock Mega (v1.29): stock en los depósitos de Megalabs (dentro de los datos cifrados) ----------
 const SM=()=>D.stock_mega||null;
@@ -1495,19 +1496,20 @@ function setIncQ(a, q){
   if(q) Q[a]=q; else delete Q[a];
   const card=document.querySelector(`[data-inccard="${a}"]`);
   if(card){ card.classList.toggle('sel', q>0);
-    const i=card.querySelector('[data-inci]'); if(i&&document.activeElement!==i) i.value=q||'';
+    const i=card.querySelector('[data-inci]'); if(i&&document.activeElement!==i){ i.value=q||''; uxBump(i); uxVib(8); }
     const m=card.querySelector('[data-d="-1"]'); if(m) m.disabled=!q;
     const s=card.querySelector('[data-incsm]'); if(s) s.outerHTML=smLinea(a,q); }
-  const t=$('#incTot'); if(t) t.innerHTML=incTotHTML(f);
+  const t=$('#incTot'); if(t){ const old=uxNum(t.querySelector('b')); t.innerHTML=incTotHTML(f); uxCount(t.querySelector('b'),old); }
   const c=$('#copiadoI'); if(c) c.textContent='';
+  uxBarSync();
 }
 // ---------- v1.33 · Exportar el pedido: Excel (.xlsx) con código de producto, o texto ----------
 const IXL='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M3 15h18M9 9v12"/></svg>';
 function pedidoActual(kind){
   const f=cur;
-  if(kind==='inc') return {f, tipo:'Productos a incorporar', items:incSel(f).map(x=>({a:String(x.a), q:x.q})), st:'#copiadoI', ta:'#pedtxtI', vacio:'Elegí la cantidad de al menos un producto.'};
+  if(kind==='inc') return {f, tipo:'Productos a incorporar', items:incSel(f).map(x=>({a:String(x.a), q:x.q})), st:'#copiadoI', ta:'#pedtxtI', bx:'#enviarInc', bt:'#enviarIncT', vacio:'Elegí la cantidad de al menos un producto.'};
   const o=pedOptAct();
-  return {f, tipo:'Pedido del mes'+(o.k?' ('+o.l+')':''), items:PED_ROWS.map(r=>({a:String(r.art), q:pedQ(f,o,r)})).filter(x=>x.q>0), st:'#copiado', ta:'#pedtxt', vacio:'El pedido no tiene cantidades.'};
+  return {f, tipo:'Pedido del mes'+(o.k?' ('+o.l+')':''), items:PED_ROWS.map(r=>({a:String(r.art), q:pedQ(f,o,r)})).filter(x=>x.q>0), st:'#copiado', ta:'#pedtxt', bx:'#copiarP', bt:'#copiarPT', vacio:'El pedido no tiene cantidades.'};
 }
 const codCli=f=>String(f.id).split('|')[1]||'';
 const fechaDMY=iso=>iso.split('-').reverse().join('/');
@@ -1519,7 +1521,7 @@ function pedidoTexto(X){
 function copiarTexto(kind){
   const X=pedidoActual(kind); if(!X.items.length){ $(X.st).textContent=X.vacio; return; }
   const txt=pedidoTexto(X);
-  const ok=()=>{ $(X.st).textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; };
+  const ok=()=>{ $(X.st).textContent='Copiado. Pegalo en WhatsApp o en el sistema de pedidos.'; uxToast('Pedido copiado: pegalo en WhatsApp o en el sistema.'); uxOk($(X.bt),'Copiado'); uxVib(12); };
   const fallback=()=>{ const t=$(X.ta); t.hidden=false; t.value=txt; t.focus(); t.select(); $(X.st).textContent='Seleccioná el texto y copialo.'; };
   try{ navigator.clipboard.writeText(txt).then(ok, fallback); }catch(e){ fallback(); }
 }
@@ -1558,7 +1560,7 @@ function xlsxBlob(rows, widths, hoja){
   return new Blob(zipStore(files),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 function pedidoExcel(kind){
-  const X=pedidoActual(kind); if(!X.items.length){ $(X.st).textContent=X.vacio; return; }
+  const X=pedidoActual(kind); if(!X.items.length){ $(X.st).textContent=X.vacio; uxToast(X.vacio); return; }
   const f=X.f, fv=fechaVisita(f).iso, t=X.items.reduce((s,x)=>s+x.q,0), num=v=>isNaN(+v)||v===''?v:{v:+v,s:6};
   const rows=[[{v:'Pedido · SmartBrick',s:5}],
     [{v:'Punto de venta',s:1},f.nombre],
@@ -1573,12 +1575,12 @@ function pedidoExcel(kind){
   const blob=xlsxBlob(rows,[18,46,12],'Pedido');
   const name=`${kind==='inc'?'Incorporar':'Pedido'}_${f.nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'')}_${fv}.xlsx`;
   const st=$(X.st);
-  const bajar=()=>{ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); st.textContent='Se descargó '+name+'.'; };
+  const bajar=()=>{ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); st.textContent='Se descargó '+name+'.'; uxToast('Excel descargado: '+name); uxOk($(X.bx),'Excel listo'); uxVib(12); };
   let file=null; try{ file=new File([blob],name,{type:blob.type}); }catch(e){}
   const movil=window.matchMedia&&matchMedia('(pointer:coarse)').matches;
   if(file&&movil&&navigator.canShare&&navigator.canShare({files:[file]})){
     navigator.share({files:[file], title:name, text:`${f.nombre} — ${X.tipo.toLowerCase()}`})
-      .then(()=>{ st.textContent='Listo: se compartió el Excel del pedido.'; })
+      .then(()=>{ st.textContent='Listo: se compartió el Excel del pedido.'; uxToast('Excel del pedido compartido.'); uxOk($(X.bx),'Enviado'); })
       .catch(e=>{ if(e&&e.name==='AbortError') st.textContent=''; else bajar(); });
   } else bajar();
 }
@@ -1665,6 +1667,252 @@ function fuenteHablada(f){
   const gF=guionFarmacia; guionFarmacia=f=>{ const S=gF(f); S.push({t:fuenteHablada(f)}); return S; };
   const gR=guionRuta; guionRuta=()=>{ const S=gR(); S.splice(Math.max(0,S.length-1),0,{t:`Fuentes: Venta Real, con datos al ${fechaH(D.corte.venta_real)}; CloseUp, con el año móvil a julio de 2026; y ventas de las cadenas de ${perSO()}.`}); return S; };
 })();
+
+// ---- v1.34 · Experiencia de usuario: movimiento suave, respuesta al toque, bienvenida, recientes y barra fija del pedido.
+// Todo el movimiento se apaga si el teléfono tiene activado "Reducir movimiento".
+const UX_RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+(function(){ const st=document.createElement('style'); st.textContent=`
+:root{--ease:cubic-bezier(.2,.8,.2,1);--ease-out:cubic-bezier(.16,1,.3,1)}
+html{-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+body{overflow-x:clip}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+:focus-visible{outline:3px solid rgba(55,180,174,.55);outline-offset:2px}
+/* encabezado de inicio más compacto */
+.hdr-c{padding:14px 16px 10px}
+.hdr-c img{height:60px}
+#hola small.hfecha{display:block;font-size:14.5px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:3px;text-shadow:none}
+/* encabezado fijo con vidrio al hacer scroll */
+.hdr{transition:box-shadow .25s,background-color .25s}
+body.ux-scrolled .hdr{background:rgba(255,255,255,.86);-webkit-backdrop-filter:saturate(1.5) blur(12px);backdrop-filter:saturate(1.5) blur(12px);box-shadow:0 1px 0 var(--line),0 8px 20px rgba(16,48,46,.10)}
+/* respuesta al toque */
+button,.mode,.cal-d,.rp,.bchip{transition:transform .16s var(--ease),box-shadow .2s var(--ease),background-color .2s,border-color .2s,color .2s}
+button:active:not(:disabled),.cal-d:active,.rp:active{transform:scale(.965)}
+.mode:active{transform:scale(.975)}
+.btn,.cta,.btn-login,.mode,#obGo{position:relative;overflow:hidden;isolation:isolate}
+.rpl{position:absolute;border-radius:50%;pointer-events:none;background:currentColor;opacity:.22;transform:scale(0);animation:uxRpl .6s var(--ease-out) forwards;z-index:-1}
+@keyframes uxRpl{to{transform:scale(1);opacity:0}}
+.cta{box-shadow:0 6px 16px rgba(34,150,143,.28)}
+.mode[aria-pressed="true"]{box-shadow:0 8px 20px rgba(34,150,143,.26)}
+.btn-login.busy::before{content:'';display:inline-block;width:16px;height:16px;margin-right:10px;vertical-align:-3px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:uxSpin .8s linear infinite}
+@keyframes uxSpin{to{transform:rotate(360deg)}}
+/* recientes */
+.urec{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px}
+.urec-l{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tq-text)}
+.urec-s{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;margin:0 -2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.urec-s::-webkit-scrollbar{display:none}
+.urec-c{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:200px;min-height:52px;padding:8px 12px;border-radius:12px;border:1.5px solid #CFE7E4;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(16,48,46,.06);text-align:left;color:var(--ink)}
+.urec-c b{font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:176px}
+.urec-c small{font-size:12px;color:var(--muted)}
+.urec-c i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#E25B3A;margin-right:5px;vertical-align:1px}
+/* "¿Cómo se calcula?" plegable */
+details.uinfo{border-top:1px solid var(--line);padding-top:8px}
+details.uinfo summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--tq-text);min-height:32px}
+details.uinfo summary::-webkit-details-marker{display:none}
+details.uinfo summary::before{content:'';width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .2s var(--ease);margin-right:2px}
+details.uinfo[open] summary::before{transform:rotate(45deg)}
+details.uinfo p{margin:6px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
+/* número que late al cambiar */
+.qsel input.bump{animation:uxBump .28s var(--ease-out)}
+@keyframes uxBump{40%{transform:scale(1.14)}}
+/* botón con confirmación */
+.btn.ok{background:#1F8A84}
+/* aviso flotante */
+.uxt{position:fixed;left:0;right:0;margin:0 auto;width:fit-content;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;align-items:center;gap:10px;max-width:min(calc(100vw - 32px),440px);padding:12px 16px;border-radius:14px;background:#14302E;color:#fff;font-size:14.5px;line-height:1.35;box-shadow:0 12px 30px rgba(0,0,0,.22);transform:translateY(140%);opacity:0;pointer-events:none;transition:transform .35s var(--ease-out),opacity .25s}
+.uxt.on{transform:none;opacity:1}
+.uxt svg{flex-shrink:0;color:#7FE0D8}
+body.ux-obar .uxt{bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+/* barra fija del pedido */
+.obar{position:fixed;left:0;right:0;bottom:0;z-index:40;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.9);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);box-shadow:0 -1px 0 var(--line),0 -10px 24px rgba(16,48,46,.10);transform:translateY(115%);transition:transform .35s var(--ease-out)}
+.obar.on{transform:none}
+.obar .in{max-width:760px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.obar .ob-t{display:flex;flex-direction:column;min-width:0}
+.obar .ob-t b{font-size:19px;line-height:1.15;letter-spacing:-.01em}
+.obar .ob-t small{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obar .btn{flex-shrink:0;min-height:46px}
+body.ux-obar .powered{padding-bottom:84px}
+/* bienvenida */
+.uxw{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:radial-gradient(900px 520px at 50% 18%,#E6F6F4,#FFFFFF 70%);transition:opacity .38s ease}
+.uxw.out{opacity:0;pointer-events:none}
+.uxw .in{display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px;text-align:center}
+.uxw img{width:min(70vw,300px);height:auto;margin-bottom:18px}
+.uxw b{font-size:26px;letter-spacing:-.01em;color:var(--ink)}
+.uxw .d{font-size:15.5px;color:var(--muted)}
+.uxw .s{font-size:13.5px;color:var(--tq-text);font-weight:600;margin-top:6px}
+.uxw .bar{width:min(58vw,220px);height:4px;border-radius:2px;background:#DDEFEC;overflow:hidden;margin-top:18px}
+.uxw .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#37B4AE,#22968F);transform-origin:left;transform:scaleX(0)}
+@media (prefers-reduced-motion:no-preference){
+  .screen{animation:none}
+  .screen:not([hidden]){animation:uxScr .34s var(--ease-out) both}
+  html[data-dir="fwd"] .screen:not([hidden]){animation-name:uxFwd}
+  html[data-dir="back"] .screen:not([hidden]){animation-name:uxBack}
+  .ux-in>*{animation:uxUp .38s var(--ease-out) both}
+  .ux-in>*:nth-child(2){animation-delay:.05s}.ux-in>*:nth-child(3){animation-delay:.1s}.ux-in>*:nth-child(4){animation-delay:.15s}.ux-in>*:nth-child(n+5){animation-delay:.2s}
+  .ux-in .kpis>*,.ux-in .acc>*:nth-child(-n+6){animation:uxUp .42s var(--ease-out) both}
+  .ux-in .kpis>*:nth-child(2),.ux-in .acc>*:nth-child(2){animation-delay:.06s}.ux-in .kpis>*:nth-child(3),.ux-in .acc>*:nth-child(3){animation-delay:.12s}.ux-in .kpis>*:nth-child(4),.ux-in .acc>*:nth-child(4){animation-delay:.18s}.ux-in .acc>*:nth-child(5){animation-delay:.22s}.ux-in .acc>*:nth-child(6){animation-delay:.26s}
+  #s-login:not([hidden]) .login-logo{animation:uxLogo .8s var(--ease-out) both}
+  #s-login:not([hidden]) .welcome{animation:uxUp .65s .14s var(--ease-out) both}
+  #s-login:not([hidden]) .lcard{animation:uxUp .7s .26s var(--ease-out) both}
+  #s-carga .login-logo{animation:uxBreath 1.8s ease-in-out infinite}
+  .urec-c{animation:uxUp .4s var(--ease-out) both}
+  .uxw img{animation:uxLogo .7s var(--ease-out) both}
+  .uxw b{animation:uxUp .55s .12s var(--ease-out) both}
+  .uxw .d{animation:uxUp .55s .2s var(--ease-out) both}
+  .uxw .s{animation:uxUp .55s .28s var(--ease-out) both}
+  .uxw .bar i{animation:uxFill .95s .15s var(--ease) forwards}
+  details.uinfo[open] p{animation:uxUp .3s var(--ease-out) both}
+}
+@keyframes uxScr{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes uxFwd{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes uxBack{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+@keyframes uxUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes uxLogo{from{opacity:0;transform:translateY(-10px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes uxBreath{50%{transform:scale(1.035);opacity:.85}}
+@keyframes uxFill{to{transform:scaleX(1)}}
+`; document.head.appendChild(st); })();
+
+// --- utilidades
+const uxVib=ms=>{ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} };
+const UX_CHECK='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function uxToast(msg){
+  let t=document.getElementById('uxToast');
+  if(!t){ t=document.createElement('div'); t.id='uxToast'; t.className='uxt'; t.setAttribute('role','status'); t.setAttribute('aria-live','polite'); document.body.appendChild(t); }
+  t.innerHTML=UX_CHECK+'<span></span>'; t.querySelector('span').textContent=msg;
+  t.classList.remove('on'); void t.offsetWidth; t.classList.add('on');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2800);
+}
+function uxOk(btn, label){
+  if(!btn) return; if(!btn._orig) btn._orig=btn.innerHTML;
+  btn.classList.add('ok'); btn.innerHTML=UX_CHECK+(label||'Listo');
+  clearTimeout(btn._h); btn._h=setTimeout(()=>{ btn.classList.remove('ok'); btn.innerHTML=btn._orig; btn._orig=null; },1800);
+}
+function uxBump(el){ if(!el||UX_RM) return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+// Números que cuentan hasta su valor (formato uruguayo: 9.391 · 2,7).
+const UX_NUM=/[-+]?\d{1,3}(?:\.\d{3})+(?:,\d+)?|[-+]?\d+(?:,\d+)?/;
+function uxNum(el){ if(!el) return null; const m=el.textContent.match(UX_NUM); return m?parseFloat(m[0].replace(/\./g,'').replace(',','.')):null; }
+function uxCount(el, from){
+  if(UX_RM||!el||el.children.length||el._cnt) return;
+  const txt=el.textContent; if(/\d\/\d/.test(txt)) return;
+  const m=txt.match(UX_NUM); if(!m) return;
+  const raw=m[0], dec=(raw.split(',')[1]||'').length, to=parseFloat(raw.replace(/\./g,'').replace(',','.'));
+  const f0=from==null?0:from; if(!isFinite(to)||f0===to||Math.abs(to)<2&&from==null) return;
+  const fmt=new Intl.NumberFormat('es-UY',{minimumFractionDigits:dec,maximumFractionDigits:dec}), plus=raw[0]==='+';
+  const pre=txt.slice(0,m.index), post=txt.slice(m.index+raw.length), t0=performance.now(), dur=from==null?700:320;
+  el._cnt=true;
+  const step=now=>{ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3), v=f0+(to-f0)*e;
+    if(k<1){ el.textContent=pre+(plus&&v>0?'+':'')+fmt.format(v)+post; requestAnimationFrame(step); } else { el.textContent=txt; el._cnt=false; } };
+  requestAnimationFrame(step);
+}
+function uxAnimPanel(p){
+  if(!p) return;
+  p.classList.remove('ux-in'); void p.offsetWidth; p.classList.add('ux-in');
+  p.querySelectorAll('.kpi .v,.zval .v,#pedTot b,.inc-tot b,.ptot>span>b').forEach(el=>uxCount(el));
+}
+// Onda al tocar los botones principales.
+document.addEventListener('pointerdown',e=>{
+  if(UX_RM) return; const b=e.target.closest('.btn,.cta,.btn-login,.mode,#obGo'); if(!b||b.disabled) return;
+  const r=b.getBoundingClientRect(), s=Math.max(r.width,r.height)*2.2, i=document.createElement('span');
+  i.className='rpl'; i.style.cssText=`width:${s}px;height:${s}px;left:${e.clientX-r.left-s/2}px;top:${e.clientY-r.top-s/2}px`;
+  b.appendChild(i); setTimeout(()=>i.remove(),650);
+},{passive:true});
+document.addEventListener('touchstart',()=>{},{passive:true});   // activa :active en iPhone
+// Encabezado con vidrio al hacer scroll + barra del pedido.
+let uxRaf=0;
+window.addEventListener('scroll',()=>{ if(uxRaf) return; uxRaf=requestAnimationFrame(()=>{ uxRaf=0; document.body.classList.toggle('ux-scrolled', scrollY>6); uxBarSync(); }); },{passive:true});
+
+// --- transiciones entre pantallas (adelante / atrás) y bienvenida al entrar
+const UX_DEPTH={carga:0,login:0,menu:1,ruta:2,farm:3,marca:4};
+let uxPrev='carga', uxWelcomed=false;
+const _uxShow=show;
+show=function(s, push){
+  const d=(UX_DEPTH[s]||0)-(UX_DEPTH[uxPrev]||0);
+  document.documentElement.dataset.dir = d>0?'fwd':(d<0?'back':'');
+  const from=uxPrev; uxPrev=s;
+  if(s==='login') uxWelcomed=false;
+  const tt=document.getElementById('uxToast'); if(tt&&from!==s) tt.classList.remove('on');
+  _uxShow(s, push);
+  if(s==='menu'&&!uxWelcomed&&(from==='carga'||from==='login')){ uxWelcomed=true; uxWelcome(); }
+  uxBarSync();
+};
+function uxSaludo(){ const h=new Date().getHours(); return h<12?'Buen día':(h<20?'Buenas tardes':'Buenas noches'); }
+function uxFechaHoy(){ const s=new Date().toLocaleDateString('es-UY',{weekday:'long',day:'numeric',month:'long'}).replace(',',''); return s.charAt(0).toUpperCase()+s.slice(1); }
+function uxNombre(){ if(!SES) return ''; return SES.rol==='vendedor' ? String(SES.nombre).split(' ')[0] : SES.nombre; }
+function uxWelcome(){
+  if(UX_RM||!SES||!D) return;
+  const w=document.createElement('div'); w.className='uxw'; w.setAttribute('role','status');
+  w.innerHTML=`<div class="in"><img src="img/logo.png" alt="SmartBrick"><b></b><span class="d"></span><span class="s"></span><i class="bar"><i></i></i></div>`;
+  w.querySelector('b').textContent=uxSaludo()+', '+uxNombre();
+  w.querySelector('.d').textContent=uxFechaHoy();
+  w.querySelector('.s').textContent=`${F.length} farmacias · ${Object.keys(Z).length} bricks · datos al ${D.corte.venta_real}`;
+  document.body.appendChild(w);
+  let gone=false; const out=()=>{ if(gone) return; gone=true; w.classList.add('out'); setTimeout(()=>w.remove(),420); };
+  w.addEventListener('click',out); setTimeout(out,1250);
+}
+// Botón de inicio de sesión con indicador de carga.
+const _uxBusy=loginBusy;
+loginBusy=function(on,txt){ _uxBusy(on,txt); const b=document.querySelector('.btn-login'); if(b) b.classList.toggle('busy',!!on); };
+
+// --- inicio: saludo según la hora, fecha y "Seguir donde quedaste"
+const _uxInit=initMenuData;
+initMenuData=function(){
+  _uxInit();
+  const h=$('#hola'); h.textContent=uxSaludo()+', '+uxNombre();
+  const sm=document.createElement('small'); sm.className='hfecha'; sm.textContent=uxFechaHoy(); h.appendChild(sm);
+};
+const uxRecKey=()=>'recientes.'+(SES?SES.nombre:'')+'.'+(D?D.vendedor:'');
+const _uxOpen=openFicha;
+openFicha=function(id){
+  _uxOpen(id);
+  if(!cur||cur.id!==id) return;
+  const L=[id,...store.get(uxRecKey(),[]).filter(x=>x!==id)].slice(0,6); store.set(uxRecKey(),L);
+};
+const _uxMenu=renderMenu;
+renderMenu=function(){
+  _uxMenu();
+  let box=document.getElementById('uxRec');
+  const L=store.get(uxRecKey(),[]).map(id=>F.find(f=>f.id===id)).filter(Boolean).slice(0,6);
+  if(!L.length){ if(box) box.remove(); return; }
+  if(!box){ box=document.createElement('div'); box.id='uxRec'; box.className='urec'; const m=document.querySelector('#s-menu .wrap.menu'); if(!m) return; m.insertBefore(box,m.firstChild); }
+  box.innerHTML=`<span class="urec-l">Seguir donde quedaste</span><div class="urec-s">${L.map((f,i)=>{ const al=(f.alertas||[]).filter(a=>a.nivel==='alta').length;
+    return `<button class="urec-c" data-open="${esc(f.id)}" style="animation-delay:${i*45}ms"><b>${esc(f.nombre)}</b><small>${al?`<i aria-hidden="true"></i>${al} alerta${al>1?'s':''} alta${al>1?'s':''}`:esc(TIPO[f.tipo])}</small></button>`; }).join('')}</div>`;
+};
+
+// --- pestañas de la ficha: el contenido entra suave y, si estabas abajo, la vista vuelve a las pestañas
+const _uxTab=renderFarmTab;
+renderFarmTab=function(){
+  _uxTab(); uxAnimPanel($('#fpanel')); uxBarSync();
+};
+$('#tabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(!b||b.dataset.k==='marca') return;
+  const t=$('#tabs').getBoundingClientRect(), hh=(document.querySelector('#s-farm .hdr')||{offsetHeight:56}).offsetHeight;
+  if(t.top<hh) window.scrollTo({top:scrollY+t.top-hh-8, behavior:UX_RM?'auto':'smooth'});
+});
+['#rres','#mpanel'].forEach(sel=>{ const p=$(sel); if(!p||!window.MutationObserver) return; let q=0;
+  new MutationObserver(()=>{ if(q) return; q=requestAnimationFrame(()=>{ q=0; if(!p.closest('.screen').hidden) uxAnimPanel(p); }); }).observe(p,{childList:true}); });
+
+// --- barra fija del pedido (Pedidos y Productos a Incorporar)
+function uxBarSync(){
+  let bar=document.getElementById('obar');
+  const real = screen==='farm' ? (curTab==='pedidos' ? $('#copiarP') : (curTab==='desvio' ? $('#enviarInc') : null)) : null;
+  let show=false, tot='', sub='';
+  if(real){
+    const src = curTab==='pedidos' ? $('#pedTot') : $('#incTot');
+    const txt = src ? src.textContent.replace(/\s+/g,' ').trim() : '';
+    const m = txt.match(/Pedido: ([\d.]+) unid\. en (\d+) productos?(?: ≈ (.+))?/);
+    const r = real.getBoundingClientRect();
+    show = !!m && r.top > innerHeight - 20;
+    if(m){ tot=m[1]+' unid.'; sub=m[2]+' producto'+(m[2]==='1'?'':'s')+(m[3]?' · ≈ '+m[3]:''); }
+  }
+  if(!bar){ if(!show) return;
+    bar=document.createElement('div'); bar.id='obar'; bar.className='obar';
+    bar.innerHTML=`<div class="in"><div class="ob-t"><b id="obTot"></b><small id="obSub"></small></div><button class="btn" id="obGo">${IXL}Enviar pedido</button></div>`;
+    document.body.appendChild(bar);
+    bar.querySelector('#obGo').addEventListener('click',()=>{ const b = curTab==='pedidos' ? $('#copiarP') : $('#enviarInc'); if(b) b.click(); });
+    void bar.offsetWidth; }
+  if(show){ const b=bar.querySelector('#obTot'), old=uxNum(b); b.textContent=tot; bar.querySelector('#obSub').textContent=sub; if(bar.classList.contains('on')&&old!=null) uxCount(b,old); }
+  bar.classList.toggle('on',show); document.body.classList.toggle('ux-obar',show);
+  bar.setAttribute('aria-hidden',show?'false':'true'); bar.querySelector('#obGo').tabIndex=show?0:-1;
+}
+window.addEventListener('resize',()=>uxBarSync());
 
 // ================= Asistente: preguntas habladas o escritas =================
 const ASK={turns:[], busy:false, ctl:null, tools:false, mode:'', clickOnly:false, wasHold:false, discard:false, sr:null, srBlocked:false, recTxt:'', recStart:0, timer:null, holding:false};
@@ -2018,7 +2266,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.33';
+const APP_VERSION='1.34';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
