@@ -1256,7 +1256,7 @@ function facHTML(f){
 }
 function pedidos(f){
   if(f.sin_datos) return `<div class="empty">Sin compras registradas en Venta Real para armar un pedido.</div>`;
-  if(!esFarmacia(f)) return pedidoCadena(f);
+  if(!esFarmacia(f)) return f.tipo==='FARMASHOP' ? pedidosSuc(f) : pedidoCadena(f);
   const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
   const C=calcPedido(f,o.f), c=C.c, Y=c.y, mN=MESL[C.v.m-1];
   const p25=c.m===1?`enero ${Y-1}`:`enero–${MESL[c.m-1]} ${Y-1}`, p26=c.m===1?`enero ${Y}`:`enero–${MESL[c.m-1]} ${Y}`;
@@ -1294,6 +1294,57 @@ function pedidos(f){
 }
 function repCadena(f){
   return (f.productos||[]).filter(p=>p.u>0&&p.stock!=null&&(p.cob==null||p.cob<2)).map(p=>({...p, rep:Math.max(0,Math.ceil(p.u/4.33*4-(p.stock||0)))})).sort((a,b)=>b.rep-a.rep);
+}
+// ---------- v1.35 · Pedido de la sucursal (Farmashop): un mes de venta (Sell-Out) × meta, menos su stock ----------
+// Si un producto quedó sin stock, su venta del mes no refleja lo que podría vender: se usa el ritmo de sucursales
+// parecidas (promedio por sucursal de la cadena × índice de esta sucursal), si es mayor.
+let PRECIO_CART=null, PRECIO_D=null;
+function precioCartera(a){
+  if(!PRECIO_CART||PRECIO_D!==D){ PRECIO_D=D; PRECIO_CART={}; const acc={}, last=MI.length-1;
+    F.forEach(g=>Object.entries(g.skum||{}).forEach(([art,arr])=>arr.forEach(r=>{ if(r[0]>=last-6&&r[1]>0&&r[3]>0) (acc[art]=acc[art]||[]).push(r[3]/r[1]); })));
+    Object.keys(acc).forEach(k=>{ const v=acc[k].sort((x,y)=>x-y); PRECIO_CART[k]=v[v.length>>1]; }); }
+  return PRECIO_CART[String(a)]||null;
+}
+function calcPedidoSuc(f, factor){
+  const k=f.kpi||{}, idx=(k.indice||100)/100, rows=[];
+  (f.productos||[]).forEach(p=>{
+    if(!P[p.art]) return;
+    const u=p.u||0, st=p.stock, stock=st==null?0:Math.max(0,st);
+    if(p.listado===false&&u<=0) return;                        // sin listar y sin venta: va en Productos a Incorporar
+    let rate=u, base='venta';
+    if(stock<=0&&(p.u_cadena||0)>0){ const r2=p.u_cadena*idx; if(r2>rate){ rate=r2; base='cadena'; } }
+    if(rate<=0) return;
+    const obj=rate*factor, sug=Math.max(0,Math.round(obj-stock));
+    rows.push({art:String(p.art), u, stock:st, cob:p.cob, rate, base, obj, sug, hab:rate, precio:precioCartera(p.art), estado:stock<=0?'quiebre':'normal'});
+  });
+  rows.sort((a,b)=>b.sug-a.sug||b.rate-a.rate);
+  return {rows, idx, n:k.n_suc||null};
+}
+function pedidosSuc(f){
+  const o=pedOptAct(), C=calcPedidoSuc(f,o.f), so=D.corte.cadenas, mes=perSO(), T=esc(TIPO[f.tipo]);
+  PED_ROWS=C.rows.filter(r=>r.sug>0);
+  const btns=PED_OPTS.map(x=>`<button data-pedopt="${x.k}" aria-pressed="${x.k===o.k}"><b>${x.k?x.l:'Igual'}</b>vs. venta de ${so}</button>`).join('');
+  const PP=(f.productos||[]).filter(p=>P[p.art]), tu=PP.reduce((s,p)=>s+(p.u||0),0), ts=PP.reduce((s,p)=>s+Math.max(0,p.stock||0),0);
+  const inc=(()=>{ const c=incCalc(f); return c?c.L.length:0; })();
+  const L=PED_ROWS;
+  const nota=r=> r.base==='cadena' ? `Sin stock al cierre: se usa el ritmo de sucursales parecidas (${n0(r.rate)} por mes). ` : (r.stock!=null&&r.stock<=0?'Sin stock al cierre. ':'');
+  return `<section class="sec"><div class="sec-h"><h2>Realizar pedido</h2><span class="src">Sell-Out ${T} · ${so}</span></div>
+    <span class="small" style="margin-top:-4px">Sucursal ${esc(f.suc||'')}: un mes de venta${o.k?` +${o.k}%`:''}, menos el stock que tiene. Las cantidades vienen precargadas: ajustalas con − y +.</span>
+    <div class="opt3" role="group" aria-label="Meta del pedido">${btns}</div>
+    <div class="ptot"><span id="pedTot">${pedTotHTML(f,o)}</span>
+      <span class="small num">Vendió ${n0(tu)} unid. en ${mes} · stock al cierre: ${n0(ts)} unid.${C.idx&&C.n?` · vende ${Math.round(C.idx*100)}% del promedio de las ${C.n} sucursales de ${T}`:''}</span></div>
+    ${L.length?`<div class="acc">${L.map(r=>{ const q=pedQ(f,o,r), nm=esc((P[r.art]||{n:r.art}).n);
+      return `<div class="acc-i pedc${q?'':' cero'}" data-pedcard="${r.art}"><div class="t tq"><b>${nm}</b>${qselPed(r.art,q,nm)}</div>
+        <p class="pmeta num"><span class="nw">Vendió en ${so}: <b>${n0(r.u)}</b></span> · <span class="nw">stock: <b>${r.stock==null?'–':n0(r.stock)}</b>${r.cob!=null?` (cubre ${nf1.format(r.cob)} sem.)`:''}</span></p>
+        <p class="pmeta num"><span class="nw">Sugerido: <b>${n0(r.sug)}</b></span></p>
+        <p class="small pnote"${nota(r)?' data-n="1"':''}${nota(r)||pedExtra(r.art,q,r.sug)?'':' hidden'}>${nota(r)} <span data-pedx="${r.art}">${pedExtra(r.art,q,r.sug)}</span></p></div>`; }).join('')}</div>
+    <button class="back" id="pedReset" style="min-height:32px;padding:0;align-self:flex-start"${pedEdit(f,o)?'':' hidden'}>Volver a las cantidades sugeridas</button>`
+      :`<div class="empty">Con lo que vendió en ${mes} y el stock que tiene, no hace falta reponer${o.k?` (ni con ${o.l})`:''}.</div>`}
+    <details class="uinfo"><summary>¿Cómo se calcula?</summary><p>Las sucursales de ${T} compran por la central de la cadena: este es el pedido sugerido para la sucursal, para pedir a la central o dejar armado en la visita.</p><p>Para cada producto: lo que vendió la sucursal en ${mes}${o.k?` × ${o.f.toFixed(2).replace('.',',')}`:''} (un mes de venta), menos su stock al cierre del mes (Sell-Out ${T}, ${so}). Si el producto quedó sin stock, se usa el ritmo de sucursales parecidas: el promedio por sucursal de la cadena × el índice de esta sucursal${C.idx?` (${Math.round(C.idx*100)}%)`:''}, cuando es mayor que lo que vendió. Los productos no listados en la sucursal están en Productos a Incorporar. El stock es el del cierre de ${mes}: confirmalo en la góndola antes de pedir. Valor aproximado con el precio neto promedio de la cartera.</p></details>
+    ${inc?`<span class="small">Además hay ${inc} producto${inc>1?'s':''} que se venden en su zona y la sucursal no vendió: <button class="back" style="min-height:28px;padding:0;display:inline" data-goto="desvio">ver Productos a Incorporar</button>.</span>`:''}
+    ${L.length?`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiarP">${IXL}Enviar pedido (Excel)</button><button class="btn sec2" id="copiarPT">Copiar como texto</button><span class="small" id="copiado" aria-live="polite" style="align-self:center;flex-basis:100%"></span></div>
+    <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>`:''}
+  </section>`;
 }
 function pedidoCadena(f){
   const ps=(f.productos||[]).filter(p=>p.u>0||(p.stock!=null&&p.stock>0));
@@ -1365,7 +1416,7 @@ function stockMega(f){
   let ped=[], pedT='';
   if(esFarmacia(f)&&!f.sin_datos){ const o=PED_OPTS.find(x=>x.k===pedOpt)||PED_OPTS[0];
     ped=calcPedido(f,o.f).rows.filter(r=>r.sug>0).map(r=>({a:String(r.art),q:pedQ(f,o,r)})).filter(x=>x.q>0); pedT=`Productos del pedido <span class="small">(${o.k?'meta '+o.l:'igual a '+(fechaVisita(f).y-1)})</span>`; }
-  else if(f.tipo==='FARMASHOP'){ ped=repCadena(f).filter(p=>p.rep>0).map(p=>({a:String(p.art),q:p.rep})); pedT='Productos para reponer en la sucursal'; }
+  else if(f.tipo==='FARMASHOP'){ const o=pedOptAct(); ped=calcPedidoSuc(f,o.f).rows.filter(r=>r.sug>0).map(r=>({a:r.art,q:pedQ(f,o,r)})).filter(x=>x.q>0); pedT=`Productos del pedido de la sucursal <span class="small">(${o.k?'venta '+o.l:'igual a la venta'})</span>`; }
   // 2 · productos a incorporar (con la cantidad elegida, si la hay)
   const C=incCalc(f), Q=INC_Q[f.id]||{};
   const inc=C?C.L.map(x=>({a:String(x.a),q:Q[x.a]||0})):[];
@@ -1509,7 +1560,7 @@ function pedidoActual(kind){
   const f=cur;
   if(kind==='inc') return {f, tipo:'Productos a incorporar', items:incSel(f).map(x=>({a:String(x.a), q:x.q})), st:'#copiadoI', ta:'#pedtxtI', bx:'#enviarInc', bt:'#enviarIncT', vacio:'Elegí la cantidad de al menos un producto.'};
   const o=pedOptAct();
-  return {f, tipo:'Pedido del mes'+(o.k?' ('+o.l+')':''), items:PED_ROWS.map(r=>({a:String(r.art), q:pedQ(f,o,r)})).filter(x=>x.q>0), st:'#copiado', ta:'#pedtxt', bx:'#copiarP', bt:'#copiarPT', vacio:'El pedido no tiene cantidades.'};
+  return {f, tipo:(esFarmacia(f)?'Pedido del mes':'Pedido de la sucursal')+(o.k?' ('+o.l+')':''), items:PED_ROWS.map(r=>({a:String(r.art), q:pedQ(f,o,r)})).filter(x=>x.q>0), st:'#copiado', ta:'#pedtxt', bx:'#copiarP', bt:'#copiarPT', vacio:'El pedido no tiene cantidades.'};
 }
 const codCli=f=>String(f.id).split('|')[1]||'';
 const fechaDMY=iso=>iso.split('-').reverse().join('/');
@@ -2266,7 +2317,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.34';
+const APP_VERSION='1.35';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
