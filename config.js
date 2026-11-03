@@ -10,6 +10,6 @@ window.SMARTBRICK_CONFIG = {
   // Cualquiera que abra la dirección puede entrar. Para terminar la prueba, borrá estas 4 líneas.
   demo: {
     usuario: 'Pablo Villasante',
-    clave: 'xzyb-mmjm-4s8f'
+    clave: 'Pablo1234'
   }
 };

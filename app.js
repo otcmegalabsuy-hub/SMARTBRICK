@@ -1,7 +1,7 @@
 /* SmartBrick · app web (Megalabs). Generado a partir del prototipo. */
 (function(){
 let D=null, P=null, Z=null, F=null;
-function setData(d){ D=d; P=d.productos; Z=d.zonas; F=d.fichas; MI=d.meses; enriquecerFuentes(); }
+function setData(d){ D=d; P=d.productos; Z=d.zonas; F=d.fichas; MI=d.meses; calcPer(); enriquecerFuentes(); }
 const $ = s => document.querySelector(s);
 const nf0 = new Intl.NumberFormat('es-UY',{maximumFractionDigits:0});
 const nf1 = new Intl.NumberFormat('es-UY',{minimumFractionDigits:1,maximumFractionDigits:1});
@@ -14,10 +14,43 @@ const cls = v => v==null ? '' : (v>0 ? 'up' : v<0 ? 'down' : '');
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MARCA = {'DOLEX':'Dolex','CIRUELAX':'Ciruelax','MEGA OMEGA':'Mega Omega 3','OMEGA 3':'Omega 3','ANTIAX':'Antiax','MICOLIS':'Micolis','WEB-C':'Web-C','PIOSAN':'Piosan','LACRIMAX':'Lacrimax','UMBRELLA':'Umbrella','C-VIT':'C-Vit','ACTIVOX':'Activox','QUELAT':'Quelat','PRO FEMME':'Profemme','ZEROACNE':'Zero Acne'};
 const marca = m => MARCA[m] || m;
-const TIPO = {INDEPENDIENTE:'Independiente',FARMASHOP:'Farmashop','SAN ROQUE':'San Roque',NATAL:'Natal'};
-const zonaCorta = b => { const z=Z[b]; if(!z) return 'Sin brick asignado'; return z.desc.replace(/^Mdeo\.:\s*/,'').replace(/^Canelones:\s*/,'').replace(/\s*\(.*\)$/,'').replace(/\bDe\b/g,'de').replace(/\bY\b/g,'y'); };
-const zonaDepto = b => { const z=Z[b]; if(!z) return ''; return /^Mdeo/.test(z.desc)?'Montevideo':/^Canelones/.test(z.desc)?'Canelones':'Treinta y Tres'; };
+const TIPO = {INDEPENDIENTE:'Independiente',FARMASHOP:'Farmashop','SAN ROQUE':'San Roque',NATAL:'Natal','EL TUNEL':'El Túnel',PIGALLE:'Pigalle'};
+const zonaCorta = b => { const z=Z[b]; if(!z) return 'Sin brick asignado'; return z.desc.replace(/^[^:]{2,20}:\s*/,'').replace(/\s*\(.*\)$/,'').replace(/\bDe\b/g,'de').replace(/\bY\b/g,'y'); };
+const zonaDepto = b => { const z=Z[b]; if(!z) return ''; const p=((z.desc||'').match(/^([^:]{2,20}):/)||[])[1]||''; return /^Mdeo/.test(p)?'Montevideo':p.trim(); };
 const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+// v1.41 · Los períodos salen de los datos cargados (Venta Real, Sell-Out y CloseUp); ya no quedan fijos en el código.
+const MESL0=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const capi=s=>s?s.charAt(0).toUpperCase()+s.slice(1):s;
+let PR={};
+function calcPer(){
+  const pe=D.periodo||{}, ult=MI[MI.length-1], ix=m=>MI.indexOf(m), ym=(y,m)=>y+'-'+String(m).padStart(2,'0');
+  const fv=String(D.corte.venta_real).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  let cierre=pe.vr_cierre;
+  if(!cierre){ if(fv){ const dd=+fv[1],mm=+fv[2],yy=+fv[3]; cierre = dd>=new Date(yy,mm,0).getDate() ? ym(yy,mm) : (mm===1?ym(yy-1,12):ym(yy,mm-1)); } else cierre=ult; }
+  const Y=+cierre.slice(0,4), mc=+cierre.slice(5,7), iC=ix(cierre), m3=k=>MESL0[(k+11)%12].slice(0,3), yy=y=>String(y).slice(2);
+  const mAdd=k=>{ const t=Y*12+mc-1+k; return [Math.floor(t/12), t%12+1]; };
+  const [y12,m12]=mAdd(-11), [,mq]=mAdd(-2);
+  const so=pe.so_mes||null, soM=so?+so.slice(5,7):0;
+  const parc=pe.vr_parcial!==undefined ? pe.vr_parcial : (ult>cierre?ult:null);
+  const fecha=pe.vr_fecha||(fv?fv[3]+'-'+fv[2].padStart(2,'0')+'-'+fv[1].padStart(2,'0'):new Date().toISOString().slice(0,10));
+  const d0=pe.dejo_desde?new Date(pe.dejo_desde+'T12:00:00'):null, fC=new Date(fecha+'T12:00:00');
+  const cuX=String(D.corte.closeup).match(/^(\w{3})-(\d{2})/), cuM=cuX?MESL0.findIndex(x=>x.slice(0,3)===cuX[1])+1:0, cuA=cuX?'20'+cuX[2]:'';
+  const tp=pe.temporada||[ym(...mAdd(-11)), ym(...mAdd(-10))];
+  PR={Y, Y0:Y-1, mc, iC, fecha,
+    i26:[ix(ym(Y,1)), iC], i25:[ix(ym(Y-1,1)), ix(ym(Y-1,mc))], i12:[Math.max(0,iC-11), iC],
+    ytd:`ene–${m3(mc)} ${Y}`, ytd25:`ene–${m3(mc)} ${Y-1}`, ytdC:`ene-${m3(mc)} ${yy(Y)}`, ytdH:capi(`ene–${m3(mc)} ${yy(Y)}`),
+    q:`${m3(mq)}–${m3(mc)}`, m12:`${m3(m12)}-${yy(y12)} a ${m3(mc)}-${yy(Y)}`,
+    lastM: ult.slice(0,4)===String(Y) ? +ult.slice(5,7) : 12,
+    iP: parc && parc.slice(0,4)===String(Y) ? +parc.slice(5,7)-1 : -1,
+    parcialTxt: parc ? `${capi(MESL0[+parc.slice(5,7)-1])} ${parc.slice(0,4)} incluye compras hasta el ${D.corte.venta_real}.` : '',
+    desde: `${MESL0[+MI[0].slice(5,7)-1]} de ${MI[0].slice(0,4)}`,
+    so: so?MESL0[soM-1]:'el último mes', soC: so?m3(soM):'mes', soY: so?`${MESL0[soM-1]} ${so.slice(0,4)}`:'',
+    dejo: d0 ? `entre ${MESL0[d0.getMonth()]} y ${MESL0[fC.getMonth()]} de ${Y-1}` : `en los mismos meses de ${Y-1}`,
+    temp: `${MESL0[+tp[0].slice(5,7)-1]} y ${MESL0[+tp[1].slice(5,7)-1]} de ${tp[0].slice(0,4)}`,
+    cuMes: cuM?MESL0[cuM-1]:'', cuY: cuA, cuC: cuM?m3(cuM)+'-'+cuA.slice(2):''
+  };
+  VR_YTD=PR.ytd;
+}
 const fdate = s => { if(!s) return '–'; const [y,m,d]=s.split('-'); return d+'/'+m+'/'+y; };
 const store = { get(k,d){ try{ const v=localStorage.getItem('sb.'+k); return v==null?d:JSON.parse(v);}catch(e){return d;} }, set(k,v){ try{ localStorage.setItem('sb.'+k, JSON.stringify(v)); }catch(e){} } };
 const size = f => f.kpi ? (f.kpi.otc_ytd26!=null ? f.kpi.otc_ytd26 : (f.kpi.venta||0)*1.6) : -1;
@@ -33,39 +66,39 @@ function alertsHTML(f){
 
 function resumen(f){
   if(f.sin_datos){
-    return `<div class="empty">Este punto de venta no tiene compras registradas en Venta Real desde enero de 2025${f.tipo==='NATAL'?' (probablemente compra por la central de la cadena)':''}. Igual podés ver cómo se mueve el mercado en su zona.</div>
+    return `<div class="empty">${f.central?`${esc(TIPO[f.tipo]||f.tipo)} compra por la central de la cadena: no hay compras ni sell-out por sucursal en los datos.`:`Este punto de venta no tiene compras registradas en Venta Real desde ${PR.desde}${f.tipo==='NATAL'?' (probablemente compra por la central de la cadena)':''}.`} Igual podés ver cómo se mueve el mercado en su zona.</div>
       <button class="btn sec2" data-goto="zona">Ver la zona</button>`;
   }
   const k=f.kpi;
   if(f.tipo==='INDEPENDIENTE'||f.tipo==='NATAL'){
     return `<div class="kpis">
-      <div class="kpi"><span class="l">Compras OTC ene–ago 2026</span><span class="v num">${moneyC(k.otc_ytd26)}</span><span class="s num"><span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. 2025</span></div>
-      <div class="kpi"><span class="l">Último trimestre (jun–ago)</span><span class="v num">${moneyC(k.otc_q26)}</span><span class="s num"><span class="${cls(k.otc_q_var)}">${pct(k.otc_q_var)}</span> vs. 2025</span></div>
+      <div class="kpi"><span class="l">Compras OTC ${PR.ytd}</span><span class="v num">${moneyC(k.otc_ytd26)}</span><span class="s num"><span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. ${PR.Y0}</span></div>
+      <div class="kpi"><span class="l">Último trimestre (${PR.q})</span><span class="v num">${moneyC(k.otc_q26)}</span><span class="s num"><span class="${cls(k.otc_q_var)}">${pct(k.otc_q_var)}</span> vs. ${PR.Y0}</span></div>
       <div class="kpi"><span class="l">Última compra OTC</span><span class="v num">${k.dias_otc==null?'–':k.dias_otc+' días'}</span><span class="s">${fdate(k.ult_otc)}</span></div>
-      <div class="kpi"><span class="l">Total Megalabs ene-ago 2026</span><span class="v num">${moneyC(k.total_ytd26)}</span><span class="s num"><span class="${cls(k.total_var)}">${pct(k.total_var)}</span> · todas las líneas</span></div>
+      <div class="kpi"><span class="l">Compras OTC 12 meses</span><span class="v num">${moneyC(k.otc_12m)}</span><span class="s">${PR.m12}</span></div>
     </div>
     <span class="small">Venta Real (compras a Megalabs, $ netos), datos al ${D.corte.venta_real}. Los días desde la última compra se cuentan a esa fecha.</span>
     <section class="sec"><div class="sec-h"><h2>Qué mirar antes de entrar</h2></div>${alertsHTML(f)}</section>
     <section class="sec"><div class="sec-h"><h2>Compras OTC por mes</h2><span class="src">Venta Real · $ netos</span></div>
-      <div class="legend"><span><i style="background:var(--series-prev)"></i>2025</span><span><i style="background:var(--brand)"></i>2026</span></div>
+      <div class="legend"><span><i style="background:var(--series-prev)"></i>${PR.Y0}</span><span><i style="background:var(--brand)"></i>${PR.Y}</span></div>
       <div class="chart" data-chart="otc">${chartMensual(f.mensual)}</div>
       <div class="readout num"></div>
-      <span class="small">Septiembre 2026 incluye compras hasta el ${D.corte.venta_real}.</span>
+      ${PR.parcialTxt?`<span class="small">${PR.parcialTxt}</span>`:''}
     </section>`;
   }
   return `<div class="kpis">
-      <div class="kpi"><span class="l">Unidades vendidas en agosto</span><span class="v num">${n0(k.unid)}</span><span class="s">productos OTC Megalabs</span></div>
-      <div class="kpi"><span class="l">Venta agosto (sin IVA)</span><span class="v num">${moneyC(k.venta)}</span><span class="s">sell-out ${TIPO[f.tipo]}</span></div>
+      <div class="kpi"><span class="l">Unidades vendidas en ${PR.so}</span><span class="v num">${n0(k.unid)}</span><span class="s">productos OTC Megalabs</span></div>
+      <div class="kpi"><span class="l">Venta ${PR.so} (sin IVA)</span><span class="v num">${moneyC(k.venta)}</span><span class="s">sell-out ${TIPO[f.tipo]}</span></div>
       <div class="kpi"><span class="l">Contra la sucursal promedio</span><span class="v num">${k.indice}</span><span class="s">100 = promedio (${n0(k.prom_cadena)} unid.)</span></div>
-      <div class="kpi"><span class="l">Puesto en la cadena</span><span class="v num">${k.rank}<span style="font-size:14px;color:var(--muted)"> de ${k.n_suc}</span></span><span class="s">por unidades en agosto</span></div>
+      <div class="kpi"><span class="l">Puesto en la cadena</span><span class="v num">${k.rank}<span style="font-size:14px;color:var(--muted)"> de ${k.n_suc}</span></span><span class="s">por unidades en ${PR.so}</span></div>
     </div>
     <span class="small">Sell-Out ${TIPO[f.tipo]}, ${perSO()}: unidades y venta sin IVA de productos OTC Megalabs.</span>
     <section class="sec"><div class="sec-h"><h2>Qué mirar antes de entrar</h2></div>${alertsHTML(f)}</section>
-    <section class="sec"><div class="sec-h"><h2>Ventas por marca en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · unidades</span></div>${barrasMarca(f.marcas)}</section>`;
+    <section class="sec"><div class="sec-h"><h2>Ventas por marca en ${PR.so}</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · unidades</span></div>${barrasMarca(f.marcas)}</section>`;
 }
 
 function barrasMarca(M){
-  if(!M||!M.length) return '<div class="empty">Sin ventas de productos OTC Megalabs en agosto.</div>';
+  if(!M||!M.length) return `<div class="empty">Sin ventas de productos OTC Megalabs en ${PR.so}.</div>`;
   const mx=Math.max(...M.map(m=>m.u));
   return '<div style="display:flex;flex-direction:column;gap:8px">'+M.map(m=>`<div style="display:grid;grid-template-columns:96px minmax(0,1fr) 48px;gap:10px;align-items:center;font-size:13.5px" title="${esc(marca(m.marca))}: ${n0(m.u)} unid.">
     <span style="font-weight:600">${esc(marca(m.marca))}</span><div class="bar" style="height:10px;width:${Math.max(2,m.u/mx*100)}%"></div><span class="num" style="text-align:right;font-weight:700">${n0(m.u)}</span></div>`).join('')+'</div>';
@@ -78,19 +111,19 @@ function axisMoney(v){ if(v>=1e6) return nf1.format(v/1e6).replace(/,0$/,'')+' M
 const CHARTS = {};
 function chartYoY(map, id, o){
   const W=340,H=170,x0=44,x1=336,y0=14,y1=140;
-  const vals=[]; for(let i=1;i<=12;i++){ const mm=String(i).padStart(2,'0'); vals.push([Math.max(0,map['2025-'+mm]||0), i<=9 ? Math.max(0,map['2026-'+mm]||0) : null]); }
+  const vals=[]; for(let i=1;i<=12;i++){ const mm=String(i).padStart(2,'0'); vals.push([Math.max(0,map[PR.Y0+'-'+mm]||0), i<=PR.lastM ? Math.max(0,map[PR.Y+'-'+mm]||0) : null]); }
   const mx=Math.max(1,...vals.flat().filter(v=>v!=null));
   const step=niceStep(mx/3), top=Math.ceil(mx/step)*step;
   const y=v=>y1-(v/top)*(y1-y0), gw=(x1-x0)/12, bw=Math.min(10,(gw-6)/2);
-  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.label)}, 2025 y 2026">`;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.label)}, ${PR.Y0} y ${PR.Y}">`;
   for(let t=0;t<=top+1e-9;t+=step){ s+=`<line x1="${x0}" x2="${x1}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${x0-6}" y="${y(t)+3.5}" text-anchor="end" font-size="9.5" fill="var(--muted)">${o.axis(t)}</text>`; }
   vals.forEach(([a,b],i)=>{
     const cx=x0+gw*i+gw/2;
-    s+=`<g data-i="${i}" tabindex="0" role="button" aria-label="${MES[i]}: 2025 ${o.val(a)}${b!=null?', 2026 '+o.val(b):''}">`;
+    s+=`<g data-i="${i}" tabindex="0" role="button" aria-label="${MES[i]}: ${PR.Y0} ${o.val(a)}${b!=null?', '+PR.Y+' '+o.val(b):''}">`;
     s+=`<rect x="${x0+gw*i}" y="${y0}" width="${gw}" height="${y1-y0+18}" fill="transparent"/>`;
     if(a>0) s+=`<path d="${barPath(cx-bw-1,y(a),bw,y1-y(a))}" fill="var(--series-prev)"/>`;
-    if(b!=null&&b>0) s+=`<path d="${barPath(cx+1,y(b),bw,y1-y(b))}" fill="var(--brand)" ${i===8?'opacity=".55"':''}/>`;
-    s+=`<text x="${cx}" y="${y1+14}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${MES[i][0]}${i===8?'*':''}</text></g>`;
+    if(b!=null&&b>0) s+=`<path d="${barPath(cx+1,y(b),bw,y1-y(b))}" fill="var(--brand)" ${i===PR.iP?'opacity=".55"':''}/>`;
+    s+=`<text x="${cx}" y="${y1+14}" text-anchor="middle" font-size="9.5" fill="var(--muted)">${MES[i][0]}${i===PR.iP?'*':''}</text></g>`;
   });
   s+=`<line x1="${x0}" x2="${x1}" y1="${y1}" y2="${y1}" stroke="var(--muted)" stroke-width="1"/></svg>`;
   CHARTS[id]={vals,val:o.val}; return s;
@@ -99,12 +132,12 @@ function chartMensual(M){ const map={}; M.forEach(r=>map[r.m]=r.v); return chart
 function bindChart(el){
   const c=CHARTS[el.dataset.chart]; if(!c) return;
   const ro=el.closest('.sec').querySelector('.readout'), vals=c.vals;
-  const show=i=>{ const [a,b]=vals[i]; ro.innerHTML=`<b>${MES[i]}</b> · 2025: <b>${c.val(a)}</b>${b!=null?` · 2026: <b>${c.val(b)}</b>`:''}${b!=null&&a>0?` <span class="${cls(b/a-1)}">(${pct((b/a-1)*100)})</span>`:''}`;
+  const show=i=>{ const [a,b]=vals[i]; ro.innerHTML=`<b>${MES[i]}</b> · ${PR.Y0}: <b>${c.val(a)}</b>${b!=null?` · ${PR.Y}: <b>${c.val(b)}</b>`:''}${b!=null&&a>0?` <span class="${cls(b/a-1)}">(${pct((b/a-1)*100)})</span>`:''}`;
     el.querySelectorAll('g[data-i]').forEach(g=>g.style.opacity = +g.dataset.i===i ? 1 : .55); };
   el.addEventListener('click',e=>{ const g=e.target.closest('g[data-i]'); if(g) show(+g.dataset.i); });
   el.addEventListener('mouseover',e=>{ const g=e.target.closest('g[data-i]'); if(g) show(+g.dataset.i); });
   el.addEventListener('keydown',e=>{ const g=e.target.closest('g[data-i]'); if(g&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); show(+g.dataset.i);} });
-  show(7);
+  show(Math.max(0,Math.min(11,PR.lastM-1)));
 }
 
 // ---------- Tableros por marca
@@ -128,11 +161,11 @@ function brandCtx(f,b){
   // farmacia (Venta Real)
   if(esFarmacia(f) && !f.sin_datos){
     const mm=new Array(MI.length).fill(0), mv=new Array(MI.length).fill(0); x.perSku={};
-    x.sk.forEach(a=>{ const rows=(f.skum||{})[a]||[]; let u12=0; rows.forEach(([i,uf,u,v])=>{ mm[i]+=u; mv[i]+=v; if(i>=8&&i<=19) u12+=u; }); x.perSku[a]={u12}; });
-    x.mm=mm; x.u26=sumR(mm,12,19); x.u25=sumR(mm,0,7); x.v26=sumR(mv,12,19); x.v25=sumR(mv,0,7);
-    x.meses12=0; for(let i=8;i<=19;i++) if(mm[i]>0) x.meses12++;
+    x.sk.forEach(a=>{ const rows=(f.skum||{})[a]||[]; let u12=0; rows.forEach(([i,uf,u,v])=>{ mm[i]+=u; mv[i]+=v; if(i>=PR.i12[0]&&i<=PR.i12[1]) u12+=u; }); x.perSku[a]={u12}; });
+    x.mm=mm; x.u26=sumR(mm,PR.i26[0],PR.i26[1]); x.u25=sumR(mm,PR.i25[0],PR.i25[1]); x.v26=sumR(mv,PR.i26[0],PR.i26[1]); x.v25=sumR(mv,PR.i25[0],PR.i25[1]);
+    x.meses12=0; for(let i=PR.i12[0];i<=PR.i12[1];i++) if(mm[i]>0) x.meses12++;
     const ps=f.productos.filter(p=>P[p.art].m===b); x.ult=ps.map(p=>p.ult).filter(Boolean).sort().pop()||null;
-    x.dias = x.ult ? Math.round((new Date('2026-09-23')-new Date(x.ult))/864e5) : null;
+    x.dias = x.ult ? Math.round((new Date(PR.fecha)-new Date(x.ult))/864e5) : null;
   }
   if(!esFarmacia(f) && !f.sin_datos){
     x.ps=f.productos.filter(p=>P[p.art].m===b && (p.listado||p.u_cadena>0));
@@ -172,10 +205,10 @@ function brandCtx(f,b){
 function insights(x){
   const L=[], f=x.f, mb=marca(x.b);
   if(esFarmacia(f) && x.u26!=null){
-    if(x.u25>0||x.u26>0) L.push([`En esta farmacia, ${mb} ${x.u25>0?'<b class="'+cls(x.u26-x.u25)+'">'+pct(gr(x.u26,x.u25))+'</b> en unidades':'<b>se empezó a comprar</b>'} (ene–ago 2026 contra 2025)${x.row?`; en la zona, la marca ${pct(x.brUG)} y el mercado de ${catName(x.cat).toLowerCase()} ${pct(x.mktG)} (año móvil)`:''}.`,'Venta Real · CloseUp']);
-    else L.push([`Esta farmacia no compró ${mb} desde enero de 2025.`,'Venta Real']);
+    if(x.u25>0||x.u26>0) L.push([`En esta farmacia, ${mb} ${x.u25>0?'<b class="'+cls(x.u26-x.u25)+'">'+pct(gr(x.u26,x.u25))+'</b> en unidades':'<b>se empezó a comprar</b>'} (${PR.ytd} contra ${PR.Y0})${x.row?`; en la zona, la marca ${pct(x.brUG)} y el mercado de ${catName(x.cat).toLowerCase()} ${pct(x.mktG)} (año móvil)`:''}.`,'Venta Real · CloseUp']);
+    else L.push([`Esta farmacia no compró ${mb} desde ${PR.desde}.`,'Venta Real']);
   }
-  if(!esFarmacia(f) && x.ps && x.ps.length) L.push([`En agosto esta sucursal vendió <b>${n0(x.uS)} unid.</b> de ${mb}, ${x.idx==null?'':'índice <b class="'+(x.idx>=100?'up':'down')+'">'+nf0.format(x.idx)+'</b> contra la sucursal promedio'}${x.sinStock.length?`; ${x.sinStock.length} presentación${x.sinStock.length>1?'es':''} sin stock`:''}.`,'Sell-Out '+TIPO[f.tipo]]);
+  if(!esFarmacia(f) && x.ps && x.ps.length) L.push([`En ${PR.so} esta sucursal vendió <b>${n0(x.uS)} unid.</b> de ${mb}, ${x.idx==null?'':'índice <b class="'+(x.idx>=100?'up':'down')+'">'+nf0.format(x.idx)+'</b> contra la sucursal promedio'}${x.sinStock.length?`; ${x.sinStock.length} presentación${x.sinStock.length>1?'es':''} sin stock`:''}.`,'Sell-Out '+TIPO[f.tipo]]);
   if(x.row){
     L.push([`Share de ${mb} en ${catName(x.cat).toLowerCase()}: <b>${nf1.format(x.sh[0][1])}%</b> en la zona (<span class="${cls(x.sh[0][1]-x.sh[0][0])}">${pp(x.sh[0][1]-x.sh[0][0])}</span> en el año); último trimestre ${nf1.format(x.sh[1][1])}%. Puesto ${x.rank} de ${x.nRank} en la categoría.`,'CloseUp']);
     const gap=(x.mix||[]).filter(m=>m.z-m.f>=10).sort((a,b)=>(b.z-b.f)-(a.z-a.f))[0];
@@ -220,15 +253,15 @@ function marcaView(f){
       const mx=Math.max(1,...rows.map(r=>r.u));
       h+=`<section class="sec"><div class="sec-h"><h2>${esc(mb)} en esta farmacia</h2><span class="src">Venta Real</span></div>
         <div class="kpis">
-          <div class="kpi"><span class="l">Unidades ene–ago 2026</span><span class="v num">${n0(x.u26)}</span><span class="s num">${x.u25>0?`<span class="${cls(x.u26-x.u25)}">${pct(gr(x.u26,x.u25))}</span> vs. 2025 (${n0(x.u25)})`:'sin compras en 2025'}</span></div>
-          <div class="kpi"><span class="l">Compras ene–ago 2026</span><span class="v num">${moneyC(x.v26)}</span><span class="s num">${x.v25>0?`<span class="${cls(x.v26-x.v25)}">${pct(gr(x.v26,x.v25))}</span> vs. 2025`:'–'}</span></div>
+          <div class="kpi"><span class="l">Unidades ${PR.ytd}</span><span class="v num">${n0(x.u26)}</span><span class="s num">${x.u25>0?`<span class="${cls(x.u26-x.u25)}">${pct(gr(x.u26,x.u25))}</span> vs. ${PR.Y0} (${n0(x.u25)})`:'sin compras en '+PR.ytd25}</span></div>
+          <div class="kpi"><span class="l">Compras ${PR.ytd}</span><span class="v num">${moneyC(x.v26)}</span><span class="s num">${x.v25>0?`<span class="${cls(x.v26-x.v25)}">${pct(gr(x.v26,x.v25))}</span> vs. ${PR.Y0}`:'–'}</span></div>
           <div class="kpi"><span class="l">Última compra de la marca</span><span class="v num">${x.dias==null?'–':x.dias+' días'}</span><span class="s">${fdate(x.ult)}</span></div>
-          <div class="kpi"><span class="l">Meses con compra</span><span class="v num">${x.meses12}<span style="font-size:14px;color:var(--muted)"> de 12</span></span><span class="s">sep-25 a ago-26</span></div>
+          <div class="kpi"><span class="l">Meses con compra</span><span class="v num">${x.meses12}<span style="font-size:14px;color:var(--muted)"> de 12</span></span><span class="s">${PR.m12}</span></div>
         </div></section>
         <section class="sec"><div class="sec-h"><h2>Unidades por mes</h2><span class="src">Venta Real · cajas · al ${D.corte.venta_real}</span></div>
-          <div class="legend"><span><i style="background:var(--series-prev)"></i>2025</span><span><i style="background:var(--brand)"></i>2026</span></div>
+          <div class="legend"><span><i style="background:var(--series-prev)"></i>${PR.Y0}</span><span><i style="background:var(--brand)"></i>${PR.Y}</span></div>
           <div class="chart" data-chart="marca">${chartYoY(map,'marca',{label:'Unidades de '+mb+' por mes',axis:v=>nf0.format(v),val:v=>n0(v)+' unid.'})}</div>
-          <div class="readout num"></div><span class="small">Septiembre 2026 incluye compras hasta el ${D.corte.venta_real}.</span></section>
+          <div class="readout num"></div>${PR.parcialTxt?`<span class="small">${PR.parcialTxt}</span>`:''}</section>
         <section class="sec"><div class="sec-h"><h2>Presentaciones que compra</h2><span class="src">Venta Real · 12 meses al ${D.corte.venta_real} · cajas</span></div>
           ${hrows(rows.map(r=>({label:esc(P[r.a].n), w:r.u/mx*100, cls:r.u>0?'b-sel':'b-oth', val:r.u>0?n0(r.u):'<span class="kind incorporar" style="margin:0">no compra</span>', sub:r.p&&r.p.dias!=null?'hace '+r.p.dias+' d':null, title:P[r.a].n})))}
         </section>`;
@@ -237,9 +270,9 @@ function marcaView(f){
     const ps=x.ps.slice().sort((p1,p2)=>(p2.u||0)-(p1.u||0)||p2.u_cadena-p1.u_cadena);
     const mx=Math.max(1,...ps.map(p=>Math.max(p.u||0,p.u_cadena||0)));
     const fs=f.tipo==='FARMASHOP';
-    h+=`<section class="sec"><div class="sec-h"><h2>${esc(mb)} en esta sucursal</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · agosto</span></div>
+    h+=`<section class="sec"><div class="sec-h"><h2>${esc(mb)} en esta sucursal</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · ${PR.so}</span></div>
       <div class="kpis">
-        <div class="kpi"><span class="l">Unidades en agosto</span><span class="v num">${n0(x.uS)}</span><span class="s num">promedio ${TIPO[f.tipo]}: ${nf1.format(x.uC)}</span></div>
+        <div class="kpi"><span class="l">Unidades en ${PR.so}</span><span class="v num">${n0(x.uS)}</span><span class="s num">promedio ${TIPO[f.tipo]}: ${nf1.format(x.uC)}</span></div>
         <div class="kpi"><span class="l">Contra la sucursal promedio</span><span class="v num ${x.idx==null?'':(x.idx>=100?'up':'down')}">${x.idx==null?'–':nf0.format(x.idx)}</span><span class="s">100 = promedio</span></div>
       </div>
       <div class="legend"><span><i style="background:var(--brand)"></i>Esta sucursal</span><span><i style="background:var(--series-prev)"></i>Sucursal promedio</span></div>
@@ -265,7 +298,7 @@ function marcaView(f){
         <div class="kpi"><span class="l">${esc(mb)} en la zona</span><span class="v num">${n0(x.brU)} <span style="font-size:13px;color:var(--muted)">unid.</span></span><span class="s num"><span class="${cls(x.brUG)}">${pct(x.brUG)}</span> año móvil</span></div>
       </div></section>
       <section class="sec"><div class="sec-h"><h2>Share por período</h2><span class="src">CloseUp, ${perCU()} · % del mercado en $</span></div>
-        <div class="legend"><span><i style="background:var(--series-prev)"></i>Año anterior</span><span><i style="background:var(--brand)"></i>Actual (a julio 2026)</span></div>
+        <div class="legend"><span><i style="background:var(--series-prev)"></i>Año anterior</span><span><i style="background:var(--brand)"></i>Actual (a ${PR.cuMes} ${PR.cuY})</span></div>
         <div class="chart">${sharePeriods(x.sh)}</div>
         <span class="small">Si el último trimestre y el último mes están por encima del año móvil, la marca viene ganando terreno.</span></section>
       <section class="sec"><div class="sec-h"><h2>Ranking de ${esc(catName(x.cat).toLowerCase())}</h2><span class="src">CloseUp, share ${perCU()} · crec. en $</span></div>
@@ -276,7 +309,7 @@ function marcaView(f){
     if(x.mix && x.mix.length){
       const mxm=Math.max(1,...x.mix.map(m=>Math.max(m.z,m.f)));
       h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones: zona contra ${esFarmacia(f)?'farmacia':'sucursal'}</h2><span class="src">% de la marca en unidades · CloseUp y ${esF?'Venta Real':'Sell-Out'}</span></div>
-        <div class="legend"><span><i style="background:var(--series-zone)"></i>Zona (CloseUp, año móvil)</span><span><i style="background:var(--brand)"></i>${esFarmacia(f)?'Farmacia (Venta Real, 12 meses)':'Sucursal (agosto)'}</span></div>
+        <div class="legend"><span><i style="background:var(--series-zone)"></i>Zona (CloseUp, año móvil)</span><span><i style="background:var(--brand)"></i>${esFarmacia(f)?'Farmacia (Venta Real, 12 meses)':'Sucursal ('+PR.so+')'}</span></div>
         <div class="hrows">${x.mix.map(m=>`<div class="hrow2"><span class="hl">${esc(P[m.a].n)}</span><div class="pair"><span class="hbar b-zone" style="width:${Math.max(1.5,m.z/mxm*100)}%"></span><span class="hbar b-sel" style="width:${Math.max(1.5,m.f/mxm*100)}%"></span></div><span class="hv num">${nf0.format(m.z)}%<small>${nf0.format(m.f)}%</small></span></div>`).join('')}</div>
         <span class="small">Cuando una presentación pesa mucho más en la zona que en ${esFarmacia(f)?'la farmacia':'la sucursal'}, conviene proponerla.</span></section>`;
     }
@@ -291,9 +324,9 @@ function marcaView(f){
   if(Z[f.brick]){
     const agg={}; x.chains.forEach(c=>c.productos.forEach(p=>{ if(P[p.art].m!==b) return; const a=agg[p.art]||(agg[p.art]={u:0,st:0,hasSt:false}); a.u+=p.u||0; if(p.stock!=null){a.st+=p.stock; a.hasSt=true;} }));
     const rows=Object.entries(agg).filter(([a,v])=>v.u>0||v.st>0).sort((r1,r2)=>r2[1].u-r1[1].u);
-    h+=`<section class="sec"><div class="sec-h"><h2>${esc(mb)} en las cadenas de la zona</h2><span class="src">Sell-Out agosto 2026</span></div>
+    h+=`<section class="sec"><div class="sec-h"><h2>${esc(mb)} en las cadenas de la zona</h2><span class="src">Sell-Out ${PR.soY}</span></div>
       ${x.chains.length?`<span class="small" style="margin-top:-6px">${x.chains.map(c=>esc(c.nombre)).join(' · ')}</span>
-      ${rows.length?`<div class="tscroll"><table><thead><tr><th>Presentación</th><th class="r">Unid. ago</th><th class="r">Stock Farmashop</th></tr></thead><tbody>${rows.map(([a,v])=>`<tr><td>${esc(P[a].n)}</td><td class="r num" style="font-weight:700">${n0(v.u)}</td><td class="r num">${v.hasSt?n0(v.st):'–'}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Las sucursales de la zona no vendieron ${esc(mb)} en agosto.</div>`}`
+      ${rows.length?`<div class="tscroll"><table><thead><tr><th>Presentación</th><th class="r">Unid. ${PR.soC}</th><th class="r">Stock Farmashop</th></tr></thead><tbody>${rows.map(([a,v])=>`<tr><td>${esc(P[a].n)}</td><td class="r num" style="font-weight:700">${n0(v.u)}</td><td class="r num">${v.hasSt?n0(v.st):'–'}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Las sucursales de la zona no vendieron ${esc(mb)} en ${PR.so}.</div>`}`
       :`<div class="empty">No hay otras sucursales de Farmashop ni San Roque de tu cartera en este brick.</div>`}
     </section>`;
   }
@@ -309,31 +342,31 @@ function compras(f){
   if(f.sin_datos) return '<div class="empty">Sin compras registradas en Venta Real.</div>';
   const M=f.marcas.filter(m=>(m.v26||0)!==0||(m.v25||0)!==0||(m.mix_zona||0)>=1);
   const mx=Math.max(1,...M.map(m=>Math.max(m.mix||0,m.mix_zona||0)));
-  const tabla = `<div class="tscroll"><table><thead><tr><th>Marca</th><th class="r">Ene–ago 26</th><th class="r">vs. 25</th><th>Peso: farmacia / zona</th></tr></thead><tbody>${
+  const tabla = `<div class="tscroll"><table><thead><tr><th>Marca</th><th class="r">${PR.ytdH}</th><th class="r">vs. ${String(PR.Y0).slice(2)}</th><th>Peso: farmacia / zona</th></tr></thead><tbody>${
     M.map(m=>`<tr><td style="font-weight:700"><button class="lnk" data-marca="${esc(m.marca)}">${esc(marca(m.marca))}</button></td><td class="r num">${moneyC(m.v26)}</td><td class="r num ${cls(m.var)}">${m.v25>0?pct(m.var):(m.v26>0?'nuevo':'–')}</td>
       <td><div class="bars" title="Farmacia ${nf1.format(m.mix||0)}% · Zona ${m.mix_zona==null?'–':nf1.format(m.mix_zona)+'%'}"><div class="bar" style="width:${(m.mix||0)/mx*100}%"></div><div class="bar z" style="width:${(m.mix_zona||0)/mx*100}%"></div></div><span class="small num">${nf0.format(m.mix||0)}% / ${m.mix_zona==null?'–':nf0.format(m.mix_zona)+'%'}</span></td></tr>`).join('')}</tbody></table></div>`;
-  const PR=f.productos.map(p=>({...p,...P[p.art]}));
-  const dejo=PR.filter(p=>p.estado==='dejo'), act=PR.filter(p=>p.estado==='activo').sort((a,b)=>(b.u12||0)-(a.u12||0)), nunca=PR.filter(p=>p.estado==='nunca');
+  const PRS=f.productos.map(p=>({...p,...P[p.art]}));
+  const dejo=PRS.filter(p=>p.estado==='dejo'), act=PRS.filter(p=>p.estado==='activo').sort((a,b)=>(b.u12||0)-(a.u12||0)), nunca=PRS.filter(p=>p.estado==='nunca');
   const lista = arr => `<div class="tscroll"><table><thead><tr><th>Producto</th><th class="r">Últ. 12 meses</th><th class="r">Última compra</th></tr></thead><tbody>${arr.map(p=>`<tr><td>${esc(p.n)}</td><td class="r num">${n0(p.u12)}</td><td class="r num">${p.dias==null?'–':'hace '+p.dias+' d'}</td></tr>`).join('')}</tbody></table></div>`;
   return `<section class="sec"><div class="sec-h"><h2>Compras por marca</h2><span class="src">Venta Real · CloseUp</span></div>
       <div class="legend"><span><i style="background:var(--brand)"></i>Peso en las compras de la farmacia</span><span><i style="background:var(--series-zone)"></i>Peso en la venta de su zona</span></div>${tabla}
-      <span class="small">Farmacia: Venta Real, ene–ago 2026 contra ene–ago 2025 ($ netos). Zona: CloseUp, ${perCU()}. Si una marca pesa mucho más en la zona que en la farmacia, hay espacio para crecer en surtido. Tocá una marca para ver sus tableros.</span></section>
-    ${dejo.length?`<section class="sec"><div class="sec-h"><h2>Dejó de comprar</h2><span class="src">${dejo.length} producto${dejo.length>1?'s':''}</span></div><span class="small">Los compró entre junio y septiembre de 2025 y en el mismo período de 2026 no (Venta Real al ${D.corte.venta_real}).</span>${lista(dejo)}</section>`:''}
+      <span class="small">Farmacia: Venta Real, ${PR.ytd} contra ${PR.ytd25} ($ netos). Zona: CloseUp, ${perCU()}. Si una marca pesa mucho más en la zona que en la farmacia, hay espacio para crecer en surtido. Tocá una marca para ver sus tableros.</span></section>
+    ${dejo.length?`<section class="sec"><div class="sec-h"><h2>Dejó de comprar</h2><span class="src">${dejo.length} producto${dejo.length>1?'s':''}</span></div><span class="small">Los compró ${PR.dejo} y en el mismo período de ${PR.Y} no (Venta Real al ${D.corte.venta_real}).</span>${lista(dejo)}</section>`:''}
     <section class="sec"><div class="sec-h"><h2>Lo que compra</h2><span class="src">${act.length} productos · Venta Real, 12 meses al ${D.corte.venta_real}</span></div>${lista(act)}</section>
     ${nunca.length?`<section class="sec"><details><summary>No compró nunca (${nunca.length} productos)</summary><div class="small" style="padding-top:6px">${nunca.map(p=>esc(p.n)).join(' · ')}</div></details></section>`:''}`;
 }
 
 function ventas(f){
-  if(f.sin_datos) return '<div class="empty">Sin datos de sell-out para esta sucursal en agosto.</div>';
+  if(f.sin_datos) return `<div class="empty">${f.central?esc(TIPO[f.tipo]||f.tipo)+' no informa sell-out por sucursal.':'Sin datos de sell-out para esta sucursal en '+PR.so+'.'}</div>`;
   const fs=f.tipo==='FARMASHOP';
   const R=f.productos.map(p=>({...p,...P[p.art]})).filter(p=>p.listado||p.u_cadena>0).sort((a,b)=>(b.u||0)-(a.u||0)||(b.u_cadena-a.u_cadena));
   const flag=p=>{ if(fs&&p.listado&&(p.stock||0)<=0&&p.u_cadena>=3) return '<span class="kind recuperar">sin stock</span>';
     if(fs&&p.listado&&(p.stock||0)>=3&&(p.u||0)===0&&p.u_cadena>=2) return '<span class="kind incorporar">sin rotación</span>';
     if(!fs&&(p.u||0)===0&&p.u_cadena>=2) return '<span class="kind revisar">sin venta</span>'; return ''; };
-  return `<section class="sec"><div class="sec-h"><h2>Productos en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · ${perSO()}</span></div>
+  return `<section class="sec"><div class="sec-h"><h2>Productos en ${PR.so}</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · ${perSO()}</span></div>
     <div class="tscroll"><table><thead><tr><th>Producto</th><th class="r">Unid.</th>${fs?'<th class="r">Stock</th><th class="r">Cob.</th>':''}<th class="r">Prom.</th></tr></thead><tbody>${
       R.map(p=>`<tr><td>${flag(p)}${esc(p.n)}</td><td class="r num" style="font-weight:700">${n0(p.u)}</td>${fs?`<td class="r num">${p.stock==null?'–':n0(p.stock)}</td><td class="r num">${p.cob==null?'–':nf1.format(p.cob)+' sem'}</td>`:''}<td class="r num">${nf1.format(p.u_cadena||0)}</td></tr>`).join('')}</tbody></table></div>
-    <span class="small">${fs?'Cob. = semanas de cobertura (stock al cierre ÷ venta semanal de agosto). ':''}Prom. = unidades por sucursal de la cadena en agosto.</span></section>`;
+    <span class="small">${fs?'Cob. = semanas de cobertura (stock al cierre ÷ venta semanal de '+PR.so+'). ':''}Prom. = unidades por sucursal de la cadena en ${PR.so}.</span></section>`;
 }
 
 function zona(f){
@@ -355,7 +388,7 @@ function zona(f){
       ${cats.slice(0,6).map(catHTML).join('')}
       ${cats.length>6?`<details><summary>Ver las otras ${cats.length-6} categorías</summary>${cats.slice(6).map(catHTML).join('')}</details>`:''}
       <span class="small">Share del total de cada categoría CloseUp. <span class="g" style="margin-left:0">GRUPO</span> = laboratorios del Grupo Megalabs.</span></section>
-    <section class="sec"><div class="sec-h"><h2>Cadenas en esta zona</h2><span class="src">Sell-Out agosto 2026</span></div>
+    <section class="sec"><div class="sec-h"><h2>Cadenas en esta zona</h2><span class="src">Sell-Out ${PR.soY}</span></div>
       ${cz.sucursales.length?`<div>${cz.sucursales.map(s=>`<div class="suc"><button class="back" style="min-height:32px;padding:0;text-align:left" data-open="${esc(s.id)}">${esc(s.nombre)}</button><span class="num">${n0(s.unid)} unid.</span></div>`).join('')}</div>
       ${cz.top.length?`<span class="small">Lo que más rota en esas sucursales: ${cz.top.slice(0,5).map(t=>esc(P[t.art].n)+' ('+n0(t.u)+')').join(' · ')}</span>`:''}`:'<div class="empty">No hay sucursales de Farmashop ni San Roque de tu cartera en este brick.</div>'}
     </section>`;
@@ -369,7 +402,7 @@ function pedido(f){
   const esFarm=f.tipo==='INDEPENDIENTE'||f.tipo==='NATAL';
   return `<section class="sec"><div class="sec-h"><h2>${esFarm?'Pedido sugerido':'Acciones en la sucursal'}</h2><span class="src">${Q.length} producto${Q.length>1?'s':''}</span></div>
     <div class="ped">${Q.map(q=>{ const p=P[q.art]; return `<div class="ped-i"><b><span class="kind ${q.tipo}">${KIND[q.tipo]}</span>${esc(p.n)}</b><div class="q num">${q.cant==null?'<small>a definir</small>':q.cant+'<small>'+(p.pack>1?'packs':'unid.')+'</small>'}</div><span class="small">${esc(q.motivo)}</span></div>`; }).join('')}</div>
-    ${esFarm?'<span class="small">Cantidades en unidades de facturación, según lo que compró en septiembre y octubre de 2025 o su promedio mensual.</span>':''}
+    ${esFarm?'<span class="small">Cantidades en unidades de facturación, según lo que compró en '+PR.temp+' o su promedio mensual.</span>':''}
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="copiar">Copiar ${esFarm?'pedido':'acciones'}</button><span class="small" id="copiado" aria-live="polite" style="align-self:center"></span></div>
     <textarea id="pedtxt" class="small" readonly hidden style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);padding:10px"></textarea>
   </section>`;
@@ -413,8 +446,8 @@ async function cargarUsuarios(){
   if(!r.ok) throw new Error('users '+r.status);
   USERS=await r.json(); return USERS;
 }
-// Contraseñas generadas: 3 grupos de 4 caracteres en minúscula. Se aceptan con o sin guiones y con mayúsculas.
-function normPass(p){ let s=String(p||'').trim(); const c=s.toLowerCase().replace(/[\s-]/g,''); if(/^[a-z0-9]{12}$/.test(c)) return c.slice(0,4)+'-'+c.slice(4,8)+'-'+c.slice(8); return s; }
+// Contraseñas: 3 grupos de 4 caracteres (con o sin guiones) o nombre+1234 (v1.41). Se aceptan con mayúsculas o minúsculas y con o sin tildes.
+function normPass(p){ let s=String(p||'').trim(); const c=s.toLowerCase().replace(/[\s-]/g,''); if(/^[a-z0-9]{12}$/.test(c)) return c.slice(0,4)+'-'+c.slice(4,8)+'-'+c.slice(8); return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,''); }
 async function abrirUsuario(u,pass){
   const base=await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
   const key=await crypto.subtle.deriveKey({name:'PBKDF2', salt:b64d(u.salt), iterations:u.iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
@@ -508,7 +541,7 @@ $('#cCartera').addEventListener('change',async e=>{ const sel=e.target; sel.disa
 
 // ---- 2 · Inicio
 const MST={ fecha: null, mode: (m=>m==='ruta'?'ruta':'farm')(store.get('mode','farm')), tipo: store.get('tipo','todas'), zona: store.get('zonaSel', null), orden: store.get('orden','prio'), q:'', farm: null };
-const TIPOS=[['todas','Todos'],['INDEPENDIENTE','Independientes'],['FARMASHOP','Farmashop'],['SAN ROQUE','San Roque'],['NATAL','Natal']];
+const TIPOS=[['todas','Todos'],['INDEPENDIENTE','Independientes'],['FARMASHOP','Farmashop'],['SAN ROQUE','San Roque'],['EL TUNEL','El Túnel'],['PIGALLE','Pigalle'],['NATAL','Natal']];
 function farmList(){
   let L=F.filter(f=> MST.mode==='zona' ? (MST.zona==='sin' ? !f.brick : String(f.brick)===MST.zona)
                                         : ((MST.tipo==='todas'||f.tipo===MST.tipo) && (!MST.q || f.nombre.toLowerCase().includes(MST.q))));
@@ -656,9 +689,9 @@ const pillG=(n,txt)=>`<span class="gpill ${n}">${txt||NIVEL[n]||n}</span>`;
 (function(){ const st=document.createElement('style'); st.textContent=`.qm{gap:10px}.qm .green-h h2{font-size:20px}.qm-sub{margin:-6px 0 2px;font-size:12.5px;color:#D9F3EF}.qm .rr-it{background:var(--green-item);border:1px solid var(--green-line);border-radius:9px;padding:10px 12px;color:#fff}.qm .rr-it b{color:#fff;font-size:15px}.qm .rr-it p{color:#E2F6F3}.qm .rr-num{background:#fff;color:#08655F}.qm .rr-it .gpill{grid-row:auto}.qm .gempty{margin:0;color:#E2F6F3}.qm-mini{padding:10px 10px 12px;gap:8px;border-radius:10px}.qm-mini h3{font-size:15.5px;font-weight:700;color:#fff;margin:2px 2px 0}.qm-mini .gitem{padding:8px 10px}.qm-mini .gitem b{font-size:14.5px}.qm-mini .gitem p{font-size:12.5px}`; document.head.appendChild(st); })();
 const zonaDe=f=>Z[f.brick]?String(f.brick):'sin';
 function kpiLine(f){
-  if(f.sin_datos) return 'Sin compras registradas en Venta Real desde enero de 2025.';
+  if(f.sin_datos) return f.central?(TIPO[f.tipo]||f.tipo)+' compra por la central de la cadena.':'Sin compras registradas en Venta Real desde '+PR.desde+'.';
   const k=f.kpi||{};
-  if(esFarmacia(f)) return `Compras OTC ene–ago 2026: <b>${moneyC(k.otc_ytd26)}</b> <span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. 2025 · última compra ${fdate(k.ult_otc)} <span class="small">(Venta Real al ${D.corte.venta_real})</span>`;
+  if(esFarmacia(f)) return `Compras OTC ${PR.ytd}: <b>${moneyC(k.otc_ytd26)}</b> <span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. ${PR.Y0} · última compra ${fdate(k.ult_otc)} <span class="small">(Venta Real al ${D.corte.venta_real})</span>`;
   return `Sell-out ${perSO()}: <b>${n0(k.unid)} unid.</b> · índice ${k.indice==null?'–':k.indice} · puesto ${k.rank} de ${k.n_suc} <span class="small">(Sell-Out ${TIPO[f.tipo]})</span>`;
 }
 // resumen corto de cada alerta para la vista unificada
@@ -668,7 +701,7 @@ const RES_ALERTA={
   caida:['Compras en baja', a=>a.titulo.replace(/^Compras OTC /,'')],
   quiebre:['Productos sin stock', a=>(a.titulo.match(/\d+/)||[''])[0]+' prod.'],
   sin_rotacion:['Con stock y sin ventas (revisar exhibición)', a=>(a.titulo.match(/\d+/)||[''])[0]+' prod.'],
-  sin_venta:['Productos sin ventas en agosto', a=>(a.titulo.match(/\d+/)||[''])[0]+' prod.'],
+  sin_venta:['Productos sin ventas en el mes', a=>(a.titulo.match(/\d+/)||[''])[0]+' prod.'],
   bajo_prom:['Venden menos que la sucursal promedio', a=>a.titulo.replace(/^Vende /,'').replace(' que la sucursal promedio','')],
   surtido:['Marcas que pesan menos que en su zona', a=>a.titulo.split(':')[0]],
   crece:['Vienen creciendo', a=>a.titulo.replace(/^Compras OTC /,'')],
@@ -706,7 +739,7 @@ function zonaCard(b,items,zi){
     <div class="rr-share"><span class="l">Share de Megalabs OTC en la zona</span><span class="v num">${nf1.format(sm)}%</span><span class="s num"><span class="${cls(dif)}">${pp(dif)}</span> contra el promedio de tu cartera (${nf1.format(sc)}%)</span></div>
     ${top?`<div><span class="small">Marcas de Megalabs que más venden en la zona (share año móvil)</span><ul class="rr-ul">${top}</ul></div>`:''}
     ${riesgo}
-    ${cad.length?`<p class="small" style="margin:0">Otras sucursales de cadenas en la zona: ${cad.map(s=>`${esc(s.nombre)} (${n0(s.unid)} unid. en agosto)`).join(' · ')}</p>`:''}
+    ${cad.length?`<p class="small" style="margin:0">Otras sucursales de cadenas en la zona: ${cad.map(s=>`${esc(s.nombre)} (${n0(s.unid)} unid. en ${PR.so})`).join(' · ')}</p>`:''}
   </div>`;
 }
 function farmCard(f,i){
@@ -732,16 +765,16 @@ function renderRutaRes(){
   h+=`<div class="kpis">
       <div class="kpi"><span class="l">Paradas</span><span class="v num">${fs.length}</span><span class="s">en ${nz} zona${nz>1?'s':''}</span></div>
       <div class="kpi"><span class="l">Alertas altas</span><span class="v num ${altas?'down':''}">${altas}</span><span class="s">y ${medias} media${medias===1?'':'s'}</span></div>
-      ${ind.length?`<div class="kpi"><span class="l">Compras OTC ene–ago 2026</span><span class="v num">${moneyC(c26)}</span><span class="s num"><span class="${cls(gr(c26,c25))}">${pct(gr(c26,c25))}</span> vs. 2025 · ${ind.length} farmacia${ind.length>1?'s':''}</span></div>`
-        :`<div class="kpi"><span class="l">Sell-out agosto</span><span class="v num">${n0(uS)}</span><span class="s">unidades en ${cad.length} sucursal${cad.length>1?'es':''}</span></div>`}
+      ${ind.length?`<div class="kpi"><span class="l">Compras OTC ${PR.ytd}</span><span class="v num">${moneyC(c26)}</span><span class="s num"><span class="${cls(gr(c26,c25))}">${pct(gr(c26,c25))}</span> vs. ${PR.Y0} · ${ind.length} farmacia${ind.length>1?'s':''}</span></div>`
+        :`<div class="kpi"><span class="l">Sell-out ${PR.so}</span><span class="v num">${n0(uS)}</span><span class="s">unidades en ${cad.length} sucursal${cad.length>1?'es':''}</span></div>`}
       <div class="kpi"><span class="l">Pedido sugerido</span><span class="v num">${ped.length}</span><span class="s">producto${ped.length===1?'':'s'} en total</span></div>
     </div>
-    <span class="small">Compras: Venta Real, ene–ago 2026 contra 2025 (datos al ${D.corte.venta_real}). Alertas: Venta Real, CloseUp (${perCU()}) y Sell-Out de cadenas (${perSO()}). Pedido sugerido: compras de sep–oct 2025 y promedio de 12 meses (Venta Real) y venta de la zona (CloseUp).</span>`;
+    <span class="small">Compras: Venta Real, ${PR.ytd} contra ${PR.Y0} (datos al ${D.corte.venta_real}). Alertas: Venta Real, CloseUp (${perCU()}) y Sell-Out de cadenas (${perSO()}). Pedido sugerido: compras de ${PR.temp} y promedio de 12 meses (Venta Real) y venta de la zona (CloseUp).</span>`;
   const pan=panorama(R.ids);
   h+=`<section class="green qm"><div class="green-h"><h2>Qué mirar en esta ruta</h2>${btnEscuchar('ruta')}</div><p class="qm-sub">Resumen de todas las paradas</p>
       ${pan?`<div class="rr-items">${pan}</div>`:'<p class="gempty">Ninguna farmacia de la ruta tiene alertas.</p>'}
       ${ped.length?`<div class="rr-it">${pillG('positiva','Pedido')}<div><b>Pedido sugerido para la ruta</b><p>${esc(pedTxt)}</p></div></div>`:''}</section>`;
-  h+=`<section class="sec"><div class="sec-h"><h2>Contexto de las zonas</h2><span class="src">CloseUp · año móvil a jul-26</span></div>${[...zonas.entries()].map(([b,items],zi)=>zonaCard(b,items,zi)).join('')}</section>`;
+  h+=`<section class="sec"><div class="sec-h"><h2>Contexto de las zonas</h2><span class="src">CloseUp · año móvil a ${PR.cuC}</span></div>${[...zonas.entries()].map(([b,items],zi)=>zonaCard(b,items,zi)).join('')}</section>`;
   h+=`<h2 class="mhead">Farmacia por farmacia</h2>${fs.map((f,i)=>farmCard(f,i)).join('')}`;
   h+=`<button class="cta" id="rrGo">Ver farmacia por farmacia ›</button>`;
   $('#rres').innerHTML=h+fuentes();
@@ -857,10 +890,10 @@ const dinero = v => v == null ? '' : Math.abs(v) >= 1e6 ? nf1.format(v / 1e6) + 
 const pctH = (v, mas, menos) => v == null ? '' : nf0.format(Math.abs(v)) + ' por ciento ' + (v >= 0 ? mas : menos);
 const diasH = d => d === 1 ? 'hace un día' : 'hace ' + d + ' días';
 function kpiHablado(f) {
-  if (f.sin_datos) return 'No tiene compras registradas en Venta Real desde enero de 2025.';
+  if (f.sin_datos) return f.central ? (TIPO[f.tipo]||f.tipo) + ' compra por la central de la cadena: no hay datos por sucursal.' : 'No tiene compras registradas en Venta Real desde ' + PR.desde + '.';
   const k = f.kpi || {};
-  if (esFarmacia(f)) return `En lo que va de 2026 compró ${dinero(k.otc_ytd26)} en productos O T C${k.otc_var != null ? ', ' + pctH(k.otc_var, 'más', 'menos') + ' que en 2025' : ''}.${k.dias_otc != null ? ' La última compra fue ' + diasH(k.dias_otc) + '.' : ''}`;
-  return `En agosto vendió ${nf0.format(k.unid || 0)} unidades de productos O T C de Megalabs. Está en el puesto ${k.rank} de ${k.n_suc} sucursales de ${TIPO[f.tipo]}.`;
+  if (esFarmacia(f)) return `En lo que va de ${PR.Y} compró ${dinero(k.otc_ytd26)} en productos O T C${k.otc_var != null ? ', ' + pctH(k.otc_var, 'más', 'menos') + ' que en ' + PR.Y0 : ''}.${k.dias_otc != null ? ' La última compra fue ' + diasH(k.dias_otc) + '.' : ''}`;
+  return `En ${PR.so} vendió ${nf0.format(k.unid || 0)} unidades de productos O T C de Megalabs. Está en el puesto ${k.rank} de ${k.n_suc} sucursales de ${TIPO[f.tipo]}.`;
 }
 function guionFarmacia(f) {
   const A = f.alertas || [], S = [];
@@ -883,7 +916,7 @@ function guionRuta() {
   const ped = fs.flatMap(f => f.pedido || []);
   const ind = fs.filter(f => esFarmacia(f) && !f.sin_datos && f.kpi), c26 = ind.reduce((s, f) => s + (f.kpi.otc_ytd26 || 0), 0), c25 = ind.reduce((s, f) => s + (f.kpi.otc_ytd25 || 0), 0);
   S.push({ t: hablar(`Resumen de la ruta del ${fechaLarga(R.fecha).toLowerCase().replace(',', '')}: ${fs.length} puntos de venta en ${zonas.size} zona${zonas.size > 1 ? 's' : ''}.`), sel: '#rres .rr-head' });
-  S.push({ t: hablar(`Hay ${altas} alerta${altas === 1 ? '' : 's'} de prioridad alta y ${medias} de prioridad media. El pedido sugerido suma ${ped.length} productos.` + (ind.length ? ` Las farmacias de la ruta llevan compradas ${dinero(c26)} en 2026${c25 ? ', ' + pctH(gr(c26, c25), 'más', 'menos') + ' que en 2025' : ''}.` : '')), sel: '#rres .kpis' });
+  S.push({ t: hablar(`Hay ${altas} alerta${altas === 1 ? '' : 's'} de prioridad alta y ${medias} de prioridad media. El pedido sugerido suma ${ped.length} productos.` + (ind.length ? ` Las farmacias de la ruta llevan compradas ${dinero(c26)} en ${PR.Y}${c25 ? ', ' + pctH(gr(c26, c25), 'más', 'menos') + ' que en ' + PR.Y0 : ''}.` : '')), sel: '#rres .kpis' });
   const G = panoramaGrupos(R.ids);
   if (G.length) {
     S.push({ t: 'Lo más importante de la ruta.' });
@@ -947,30 +980,30 @@ function greenPanel(f){
 }
 const BTN_MARCAS=`<button class="bigbtn" id="analizar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-7M2 20h20"></path></svg>Analizar por marcas</button>`;
 function resumenV2(f){
-  if(f.sin_datos) return `<div class="empty">Este punto de venta no tiene compras registradas en Venta Real desde enero de 2025${f.tipo==='NATAL'?' (probablemente compra por la central de la cadena)':''}. Igual podés ver el mercado de su zona por marca.</div>${greenPanel(f)}${BTN_MARCAS}`;
+  if(f.sin_datos) return `<div class="empty">${f.central?`${esc(TIPO[f.tipo]||f.tipo)} compra por la central de la cadena: no hay compras ni sell-out por sucursal en los datos.`:`Este punto de venta no tiene compras registradas en Venta Real desde ${PR.desde}${f.tipo==='NATAL'?' (probablemente compra por la central de la cadena)':''}.`} Igual podés ver el mercado de su zona por marca.</div>${greenPanel(f)}${BTN_MARCAS}`;
   const k=f.kpi;
   if(esFarmacia(f)) return `<div class="kpis">
-      <div class="kpi"><span class="l">Compras OTC ene-ago 2026</span><span class="v num">${moneyC(k.otc_ytd26)}</span><span class="s num"><span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. 2025</span></div>
-      <div class="kpi"><span class="l">Último trimestre (jun-ago)</span><span class="v num">${moneyC(k.otc_q26)}</span><span class="s num"><span class="${cls(k.otc_q_var)}">${pct(k.otc_q_var)}</span> vs. 2025</span></div>
+      <div class="kpi"><span class="l">Compras OTC ${PR.ytd}</span><span class="v num">${moneyC(k.otc_ytd26)}</span><span class="s num"><span class="${cls(k.otc_var)}">${pct(k.otc_var)}</span> vs. ${PR.Y0}</span></div>
+      <div class="kpi"><span class="l">Último trimestre (${PR.q})</span><span class="v num">${moneyC(k.otc_q26)}</span><span class="s num"><span class="${cls(k.otc_q_var)}">${pct(k.otc_q_var)}</span> vs. ${PR.Y0}</span></div>
       <div class="kpi"><span class="l">Última compra OTC</span><span class="v num">${k.dias_otc==null?'–':k.dias_otc+(k.dias_otc===1?' día':' días')}</span><span class="s">${fdate(k.ult_otc)}</span></div>
-      <div class="kpi"><span class="l">Total Megalabs ene-ago 2026</span><span class="v num">${moneyC(k.total_ytd26)}</span><span class="s num"><span class="${cls(k.total_var)}">${pct(k.total_var)}</span> todas las líneas</span></div>
+      <div class="kpi"><span class="l">Compras OTC 12 meses</span><span class="v num">${moneyC(k.otc_12m)}</span><span class="s">${PR.m12}</span></div>
     </div>
     <span class="small">Venta Real (compras a Megalabs, $ netos), datos al ${D.corte.venta_real}. Los días desde la última compra se cuentan a esa fecha.</span>
     ${greenPanel(f)}
     <section class="sec"><div class="sec-h"><h2>Compras OTC por mes</h2><span class="src">Venta Real · $ netos</span></div>
-      <div class="legend"><span><i style="background:var(--series-prev)"></i>2025</span><span><i style="background:var(--brand)"></i>2026</span></div>
+      <div class="legend"><span><i style="background:var(--series-prev)"></i>${PR.Y0}</span><span><i style="background:var(--brand)"></i>${PR.Y}</span></div>
       <div class="chart" data-chart="otc">${chartMensual(f.mensual)}</div>
-      <div class="readout num"></div><span class="small">Septiembre 2026 incluye compras hasta el ${D.corte.venta_real}.</span></section>
+      <div class="readout num"></div>${PR.parcialTxt?`<span class="small">${PR.parcialTxt}</span>`:''}</section>
     ${BTN_MARCAS}`;
   return `<div class="kpis">
-      <div class="kpi"><span class="l">Unidades en agosto</span><span class="v num">${n0(k.unid)}</span><span class="s">productos OTC Megalabs</span></div>
-      <div class="kpi"><span class="l">Venta agosto (sin IVA)</span><span class="v num">${moneyC(k.venta)}</span><span class="s">sell-out ${TIPO[f.tipo]}</span></div>
+      <div class="kpi"><span class="l">Unidades en ${PR.so}</span><span class="v num">${n0(k.unid)}</span><span class="s">productos OTC Megalabs</span></div>
+      <div class="kpi"><span class="l">Venta ${PR.so} (sin IVA)</span><span class="v num">${moneyC(k.venta)}</span><span class="s">sell-out ${TIPO[f.tipo]}</span></div>
       <div class="kpi"><span class="l">Contra sucursal promedio</span><span class="v num ${k.indice>=100?'up':'down'}">${k.indice}</span><span class="s">100 = promedio (${n0(k.prom_cadena)} unid.)</span></div>
-      <div class="kpi"><span class="l">Puesto en la cadena</span><span class="v num">${k.rank}<span style="font-size:15px;color:var(--muted)"> de ${k.n_suc}</span></span><span class="s">por unidades en agosto</span></div>
+      <div class="kpi"><span class="l">Puesto en la cadena</span><span class="v num">${k.rank}<span style="font-size:15px;color:var(--muted)"> de ${k.n_suc}</span></span><span class="s">por unidades en ${PR.so}</span></div>
     </div>
     <span class="small">Sell-Out ${TIPO[f.tipo]}, ${perSO()}: unidades y venta sin IVA de productos OTC Megalabs.</span>
     ${greenPanel(f)}
-    <section class="sec"><div class="sec-h"><h2>Ventas por marca en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · unidades</span></div>${barrasMarca(f.marcas)}</section>
+    <section class="sec"><div class="sec-h"><h2>Ventas por marca en ${PR.so}</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · unidades</span></div>${barrasMarca(f.marcas)}</section>
     ${BTN_MARCAS}`;
 }
 // enlaces desde Compras (marca) hacia la pantalla de marcas
@@ -1007,10 +1040,10 @@ function marcaScreen(f){
   // Lo más importante
   const I=[];
   if(esF && x.u26!=null){
-    if(x.u25>0||x.u26>0) I.push(['box',`<b>${esc(mb)}: ${x.u25>0?sp(x.u26-x.u25,pct(gr(x.u26,x.u25)))+' en unidades (vs 2025).':'empezó a comprarse en 2026.'}</b>${x.row?`<small>Mercado de ${esc(catName(x.cat).toLowerCase())}: ${sp(x.mktG,pct(x.mktG))} (año móvil).</small>`:''}`,'Venta Real · CloseUp']);
-    else I.push(['box',`<b>Esta farmacia no compró ${esc(mb)} desde enero de 2025.</b>${x.row?`<small>En la zona, ${esc(mb)} vende ${n0(x.brU)} unid. al año.</small>`:''}`,'Venta Real · CloseUp']);
+    if(x.u25>0||x.u26>0) I.push(['box',`<b>${esc(mb)}: ${x.u25>0?sp(x.u26-x.u25,pct(gr(x.u26,x.u25)))+' en unidades (vs '+PR.Y0+').':'empezó a comprarse en '+PR.Y+'.'}</b>${x.row?`<small>Mercado de ${esc(catName(x.cat).toLowerCase())}: ${sp(x.mktG,pct(x.mktG))} (año móvil).</small>`:''}`,'Venta Real · CloseUp']);
+    else I.push(['box',`<b>Esta farmacia no compró ${esc(mb)} desde ${PR.desde}.</b>${x.row?`<small>En la zona, ${esc(mb)} vende ${n0(x.brU)} unid. al año.</small>`:''}`,'Venta Real · CloseUp']);
   } else if(!esF && x.ps){
-    I.push(['store',`<b>${esc(mb)}: ${n0(x.uS)} unid. en agosto.</b><small>Índice ${x.idx==null?'–':sp(x.idx-100,nf0.format(x.idx))} contra la sucursal promedio de ${TIPO[f.tipo]}${x.sinStock.length?`; ${x.sinStock.length} presentación${x.sinStock.length>1?'es':''} sin stock`:''}.</small>`,'Sell-Out '+TIPO[f.tipo]]);
+    I.push(['store',`<b>${esc(mb)}: ${n0(x.uS)} unid. en ${PR.so}.</b><small>Índice ${x.idx==null?'–':sp(x.idx-100,nf0.format(x.idx))} contra la sucursal promedio de ${TIPO[f.tipo]}${x.sinStock.length?`; ${x.sinStock.length} presentación${x.sinStock.length>1?'es':''} sin stock`:''}.</small>`,'Sell-Out '+TIPO[f.tipo]]);
   }
   if(x.row){
     const d=x.sh[0][1]-x.sh[0][0];
@@ -1027,28 +1060,28 @@ function marcaScreen(f){
     if(f.sin_datos||x.u26==null) h+=`<div class="empty">Sin compras registradas en Venta Real.</div>`;
     else {
       const gu=gr(x.u26,x.u25), gv=gr(x.v26,x.v25);
-      h+=`<div class="dcard"><span class="l">Unidades (ene-ago 2026)</span><span class="v num">${n0(x.u26)}</span><span class="s num">${x.u25>0?ARR(gu)+sp(gu,pct(gu))+` vs 2025 (${n0(x.u25)})`:'sin compras en ene-ago 2025'}</span></div>
-        <div class="dcard"><span class="l">Compras (ene-ago 2026)</span><span class="v num">${moneyC(x.v26)}</span><span class="s num">${x.v25>0?ARR(gv)+sp(gv,pct(gv))+' vs 2025':'–'}</span></div>
+      h+=`<div class="dcard"><span class="l">Unidades (${PR.ytd})</span><span class="v num">${n0(x.u26)}</span><span class="s num">${x.u25>0?ARR(gu)+sp(gu,pct(gu))+` vs ${PR.Y0} (${n0(x.u25)})`:'sin compras en '+PR.ytd25}</span></div>
+        <div class="dcard"><span class="l">Compras (${PR.ytd})</span><span class="v num">${moneyC(x.v26)}</span><span class="s num">${x.v25>0?ARR(gv)+sp(gv,pct(gv))+' vs '+PR.Y0:'–'}</span></div>
         <div class="dcard"><span class="l">Última compra de la marca</span><span class="v num">${x.dias==null?'–':x.dias+(x.dias===1?' día':' días')}</span><span class="s">${CAL}${fdate(x.ult)}</span></div>
-        <div class="dcard"><span class="l">Meses con compra</span><span class="v num">${x.meses12} de 12</span><span class="s">${CAL}sep-25 a ago-26</span></div>`;
+        <div class="dcard"><span class="l">Meses con compra</span><span class="v num">${x.meses12} de 12</span><span class="s">${CAL}${PR.m12}</span></div>`;
       const map={}; MI.forEach((m,i)=>map[m]=x.mm[i]);
       const rows=x.sk.map(a=>({a,u:(x.perSku[a]||{u12:0}).u12,p:f.productos.find(p=>String(p.art)===a)})).sort((r1,r2)=>r2.u-r1.u);
       const mx=Math.max(1,...rows.map(r=>r.u));
       h+=`<section class="sec"><div class="sec-h"><h2>Unidades por mes</h2><span class="src">Venta Real · cajas · al ${D.corte.venta_real}</span></div>
-          <div class="legend"><span><i style="background:var(--series-prev)"></i>2025</span><span><i style="background:var(--brand)"></i>2026</span></div>
+          <div class="legend"><span><i style="background:var(--series-prev)"></i>${PR.Y0}</span><span><i style="background:var(--brand)"></i>${PR.Y}</span></div>
           <div class="chart" data-chart="marca">${chartYoY(map,'marca',{label:'Unidades de '+mb+' por mes',axis:v=>nf0.format(v),val:v=>n0(v)+' unid.'})}</div>
-          <div class="readout num"></div><span class="small">Septiembre 2026 incluye compras hasta el ${D.corte.venta_real}.</span></section>
+          <div class="readout num"></div>${PR.parcialTxt?`<span class="small">${PR.parcialTxt}</span>`:''}</section>
         <section class="sec"><div class="sec-h"><h2>Presentaciones que compra</h2><span class="src">Venta Real · 12 meses al ${D.corte.venta_real} · cajas</span></div>
           ${hrows(rows.map(r=>({label:esc(P[r.a].n),w:r.u/mx*100,cls:r.u>0?'b-sel':'b-oth',val:r.u>0?n0(r.u):'<span class="kind incorporar" style="margin:0">no compra</span>',sub:r.p&&r.p.dias!=null?'hace '+r.p.dias+' d':null,title:P[r.a].n})))}</section>`;
     }
   } else if(!f.sin_datos){
     const fs=f.tipo==='FARMASHOP';
-    h+=`<div class="dcard"><span class="l">Unidades (agosto 2026)</span><span class="v num">${n0(x.uS)}</span><span class="s num">promedio ${TIPO[f.tipo]}: ${nf1.format(x.uC)}</span></div>
+    h+=`<div class="dcard"><span class="l">Unidades (${PR.soY})</span><span class="v num">${n0(x.uS)}</span><span class="s num">promedio ${TIPO[f.tipo]}: ${nf1.format(x.uC)}</span></div>
       <div class="dcard"><span class="l">Contra la sucursal promedio</span><span class="v num">${x.idx==null?'–':sp(x.idx-100,nf0.format(x.idx))}</span><span class="s">100 = sucursal promedio de ${TIPO[f.tipo]}</span></div>
-      <div class="dcard"><span class="l">Presentaciones con venta en agosto</span><span class="v num">${x.ps.filter(p=>(p.u||0)>0).length} de ${x.sk.length}</span><span class="s">${fs?x.sinStock.length+' sin stock al cierre':'San Roque no informa stock'}</span></div>`;
+      <div class="dcard"><span class="l">Presentaciones con venta en ${PR.so}</span><span class="v num">${x.ps.filter(p=>(p.u||0)>0).length} de ${x.sk.length}</span><span class="s">${fs?x.sinStock.length+' sin stock al cierre':'San Roque no informa stock'}</span></div>`;
     const ps=x.ps.slice().sort((p1,p2)=>(p2.u||0)-(p1.u||0)||p2.u_cadena-p1.u_cadena);
     const mx=Math.max(1,...ps.map(p=>Math.max(p.u||0,p.u_cadena||0)));
-    h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones en agosto</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · ${perSO()}</span></div>
+    h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones en ${PR.so}</h2><span class="src">Sell-Out ${TIPO[f.tipo]} · ${perSO()}</span></div>
       <div class="legend"><span><i style="background:var(--brand)"></i>Esta sucursal</span><span><i style="background:var(--series-prev)"></i>Sucursal promedio</span></div>
       <div class="hrows">${ps.map(p=>`<div class="hrow2"><span class="hl">${esc(P[p.art].n)}${fs&&p.listado&&(p.stock||0)<=0?' <span class="kind recuperar">sin stock</span>':''}</span>
         <div class="pair"><span class="hbar b-sel" style="width:${Math.max(1.5,(p.u||0)/mx*100)}%"></span><span class="hbar b-oth" style="width:${Math.max(1.5,(p.u_cadena||0)/mx*100)}%"></span></div>
@@ -1070,7 +1103,7 @@ function marcaScreen(f){
         <div class="kpi"><span class="l">${esc(mb)} en la zona</span><span class="v num">${n0(x.brU)}<span style="font-size:14px;color:var(--muted)"> unid.</span></span><span class="s num">${sp(x.brUG,pct(x.brUG))} año móvil</span></div>
       </div>
       <section class="sec"><div class="sec-h"><h2>Share por período</h2><span class="src">CloseUp, ${perCU()} · % del mercado en $</span></div>
-        <div class="legend"><span><i style="background:var(--series-prev)"></i>Año anterior</span><span><i style="background:var(--brand)"></i>Actual (a julio 2026)</span></div>
+        <div class="legend"><span><i style="background:var(--series-prev)"></i>Año anterior</span><span><i style="background:var(--brand)"></i>Actual (a ${PR.cuMes} ${PR.cuY})</span></div>
         <div class="chart">${sharePeriods(x.sh)}</div>
         <span class="small">Si el último trimestre y el último mes superan al año móvil, la marca viene ganando terreno.</span></section>
       <section class="sec"><div class="sec-h"><h2>Ranking de ${esc(catName(x.cat).toLowerCase())}</h2><span class="src">CloseUp, share ${perCU()} · crec. en $</span></div>
@@ -1080,7 +1113,7 @@ function marcaScreen(f){
     if(x.mix&&x.mix.length){
       const mxm=Math.max(1,...x.mix.map(m=>Math.max(m.z,m.f)));
       h+=`<section class="sec"><div class="sec-h"><h2>Presentaciones: zona contra ${esF?'farmacia':'sucursal'}</h2><span class="src">% de la marca en unidades · CloseUp y ${esF?'Venta Real':'Sell-Out'}</span></div>
-        <div class="legend"><span><i style="background:var(--series-zone)"></i>Zona (CloseUp, año móvil)</span><span><i style="background:var(--brand)"></i>${esF?'Farmacia (Venta Real, 12 meses)':'Sucursal (agosto)'}</span></div>
+        <div class="legend"><span><i style="background:var(--series-zone)"></i>Zona (CloseUp, año móvil)</span><span><i style="background:var(--brand)"></i>${esF?'Farmacia (Venta Real, 12 meses)':'Sucursal ('+PR.so+')'}</span></div>
         <div class="hrows">${x.mix.map(m=>`<div class="hrow2"><span class="hl">${esc(P[m.a].n)}</span><div class="pair"><span class="hbar b-zone" style="width:${Math.max(1.5,m.z/mxm*100)}%"></span><span class="hbar b-sel" style="width:${Math.max(1.5,m.f/mxm*100)}%"></span></div><span class="hv num">${nf0.format(m.z)}%<small>${nf0.format(m.f)}%</small></span></div>`).join('')}</div>
         <span class="small">Cuando una presentación pesa mucho más en la zona que en ${esF?'la farmacia':'la sucursal'}, conviene proponerla.</span></section>`;
     }
@@ -1092,9 +1125,9 @@ function marcaScreen(f){
   if(Z[f.brick]){
     const agg={}; x.chains.forEach(c=>c.productos.forEach(p=>{ if(P[p.art].m!==b) return; const a=agg[p.art]||(agg[p.art]={u:0,st:0,hasSt:false}); a.u+=p.u||0; if(p.stock!=null){a.st+=p.stock;a.hasSt=true;} }));
     const rows=Object.entries(agg).filter(([a,v])=>v.u>0||v.st>0).sort((r1,r2)=>r2[1].u-r1[1].u);
-    h+=`<section class="sec"><div class="sec-h"><h2>${esc(mb)} en las cadenas de la zona</h2><span class="src">Sell-Out agosto 2026</span></div>
+    h+=`<section class="sec"><div class="sec-h"><h2>${esc(mb)} en las cadenas de la zona</h2><span class="src">Sell-Out ${PR.soY}</span></div>
       ${x.chains.length?`<span class="small">${x.chains.map(c=>esc(c.nombre)).join(' · ')}</span>
-      ${rows.length?`<div class="tscroll"><table><thead><tr><th>Presentación</th><th class="r">Unid. ago</th><th class="r">Stock Farmashop</th></tr></thead><tbody>${rows.map(([a,v])=>`<tr><td>${esc(P[a].n)}</td><td class="r num" style="font-weight:700">${n0(v.u)}</td><td class="r num">${v.hasSt?n0(v.st):'–'}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Las sucursales de la zona no vendieron ${esc(mb)} en agosto.</div>`}`
+      ${rows.length?`<div class="tscroll"><table><thead><tr><th>Presentación</th><th class="r">Unid. ${PR.soC}</th><th class="r">Stock Farmashop</th></tr></thead><tbody>${rows.map(([a,v])=>`<tr><td>${esc(P[a].n)}</td><td class="r num" style="font-weight:700">${n0(v.u)}</td><td class="r num">${v.hasSt?n0(v.st):'–'}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Las sucursales de la zona no vendieron ${esc(mb)} en ${PR.so}.</div>`}`
       :`<div class="empty">No hay otras sucursales de Farmashop ni San Roque de tu cartera en este brick.</div>`}</section>`;
   }
   return h;
@@ -1168,6 +1201,10 @@ function marcaScreen(f){
 .ptab.sm th{white-space:nowrap}
 .ptab.sm td:first-child{overflow-wrap:anywhere}
 .ptab.sm td small .chip-s{margin-top:3px}
+.ptab.suct{font-size:12.5px}
+.ptab.suct td:first-child{overflow-wrap:normal;hyphens:auto}
+.ptab.suct tr.s0 td{background:#FDF0EC}
+.ptab.suct tr.s0 td:first-child{box-shadow:inset 3px 0 0 #D9583B}
 .chip-s.nost{background:#FBE3DC;color:#9A2A12}
 .chip-s.low{background:#FAF0D6;color:#7A5300}
 .qsel.qw input{width:66px}
@@ -1224,13 +1261,8 @@ const PED_OPTS=[{k:0,f:1,l:'Igual'},{k:2,f:1.02,l:'+2%'},{k:4,f:1.04,l:'+4%'}];
 const PED_TOPE_MESES=2;
 let pedOpt = store.get('pedopt',0);
 let PED_ROWS=[];
-// Último mes cerrado según el corte de Venta Real (23/09/2026 → agosto 2026).
-function mesCerrado(){
-  const m=String(D.corte.venta_real).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if(!m) { const u=MI[MI.length-1].split('-').map(Number); return {y:u[0], m:u[1]}; }
-  const dd=+m[1], mm=+m[2], yy=+m[3], fin=new Date(yy,mm,0).getDate();
-  return dd>=fin ? {y:yy,m:mm} : (mm===1?{y:yy-1,m:12}:{y:yy,m:mm-1});
-}
+// Último mes cerrado de Venta Real (v1.41: viene en los datos, D.periodo.vr_cierre).
+function mesCerrado(){ return {y:PR.Y, m:PR.mc}; }
 const mes3=(m,y)=>MESL[m-1].slice(0,3)+'-'+String(y).slice(2);
 function calcPedido(f, factor){
   const v=fechaVisita(f), c=mesCerrado(), Y=c.y, mc=c.m;
@@ -1404,8 +1436,8 @@ function pedidoCadena(f){
     <div class="empty" style="text-align:left">Las sucursales de ${esc(TIPO[f.tipo])} compran por la central de la cadena: no hay compras por sucursal para comparar con el año anterior.</div>
     ${conStock?`<h3 style="margin:4px 0 0;font-size:15px">Para reponer en la sucursal</h3>
       ${bajos.length?`<table class="ptab"><thead><tr><th>Producto</th><th>Vendió</th><th>Stock</th><th>Reponer</th></tr></thead><tbody>${bajos.map(p=>`<tr><td>${esc(P[p.art].n)}<small>${p.cob==null?'sin stock':'cubre '+nf1.format(p.cob)+' semanas'}</small>${smChip(p.art,p.rep)?`<small>${smChip(p.art,p.rep)}</small>`:''}</td><td class="num">${n0(p.u)}</td><td class="num">${n0(p.stock)}</td><td class="num psug">${n0(p.rep)}</td></tr>`).join('')}</tbody></table>
-      <span class="small">Productos con menos de 2 semanas de stock según lo que vendió en agosto; la reposición lleva la cobertura a 4 semanas.</span>`:'<div class="empty">Ningún producto tiene menos de 2 semanas de stock.</div>'}`
-    :`<h3 style="margin:4px 0 0;font-size:15px">Lo que más vendió en agosto</h3><table class="ptab"><thead><tr><th>Producto</th><th>Unid.</th></tr></thead><tbody>${top.map(p=>`<tr><td>${esc(P[p.art].n)}</td><td class="num">${n0(p.u)}</td></tr>`).join('')}</tbody></table>
+      <span class="small">Productos con menos de 2 semanas de stock según lo que vendió en ${PR.so}; la reposición lleva la cobertura a 4 semanas.</span>`:'<div class="empty">Ningún producto tiene menos de 2 semanas de stock.</div>'}`
+    :`<h3 style="margin:4px 0 0;font-size:15px">Lo que más vendió en ${PR.so}</h3><table class="ptab"><thead><tr><th>Producto</th><th>Unid.</th></tr></thead><tbody>${top.map(p=>`<tr><td>${esc(P[p.art].n)}</td><td class="num">${n0(p.u)}</td></tr>`).join('')}</tbody></table>
       <span class="small">${esc(TIPO[f.tipo])} no informa stock por sucursal.</span>`}
   </section>`;
 }
@@ -1472,6 +1504,10 @@ function stockMega(f){
   const inc=C?C.L.map(x=>({a:String(x.a),q:Q[x.a]||0})):[];
   const prob=L=>L.filter(x=>{ const s=smU(x.a); return s!=null&&(s<=0||(x.q>0&&x.q>s)); });
   const pP=prob(ped), pI=prob(inc.filter(x=>x.q>0)), incSel=inc.filter(x=>x.q>0);
+  // v1.40 · En cadenas que informan stock por sucursal (Farmashop): stock de la sucursal para cada producto del pedido.
+  const cS=!esFarmacia(f)&&D.cadenas&&D.cadenas[f.tipo]&&D.cadenas[f.tipo].con_stock;
+  const pS=a=>{ const p=(f.productos||[]).find(x=>String(x.art)===String(a)); return p&&p.listado?(p.stock==null?null:p.stock):null; };
+  const s0=cS?ped.filter(x=>{ const s=pS(x.a); return s!=null&&s<=0; }):[];
   const nom=a=>esc((P[a]||{n:a}).n);
   const celda=x=>{ const s=smU(x.a); if(s==null) return '<span class="chip-s">Sin dato</span>';
     if(s<=0) return '<span class="chip-s nost">Sin stock</span>';
@@ -1487,14 +1523,17 @@ function stockMega(f){
     res=`<div class="sm-res ok">${okI}<span><b>Hay stock en Mega para ${partes}.</b></span></div>`; }
   else res=`<div class="sm-res ok">${okI}<span>No hay pedido sugerido para esta visita. Abajo está el stock de los productos a incorporar y de todo el portafolio OTC.</span></div>`;
   const todos=Object.keys(P).sort((x,y)=>String(P[x].m).localeCompare(String(P[y].m))||P[x].n.localeCompare(P[y].n));
-  const sin=todos.filter(a=>(smU(a)||0)<=0);
+  const sin=todos.filter(a=>smU(a)!=null&&smU(a)<=0), sd=todos.filter(a=>smU(a)==null);
   return `<section class="sec"><div class="sec-h"><h2>Stock OTC Megalabs</h2><span class="src">D4 · al ${esc(S.fecha)}</span></div>
     ${res}
     ${ped.length?`<h3 class="sm-h">${pedT}</h3>${tabla(ped,esFarmacia(f)?'Pedir':'Reponer')}`:''}
+    ${cS&&ped.length?`<h3 class="sm-h">Stock para el pedido <span class="small">(${esc(f.nombre)} · cierre de ${PR.so})</span></h3>
+      ${s0.length?`<div class="sm-res warn">${wI}<span><b>${pl(s0.length,'presentación sin stock','presentaciones sin stock')} en la sucursal:</b> ${s0.map(x=>nom(x.a)).join(' · ')}.${s0.some(x=>(smU(x.a)||0)>0)?' Hay stock en D4 para reponerlas.':''}</span></div>`:''}
+      <table class="ptab sm suct"><thead><tr><th>Producto</th><th>Pedido</th><th>Sucursal</th><th>En Mega</th></tr></thead><tbody>${ped.map(x=>{ const s=pS(x.a); return `<tr${s!=null&&s<=0?' class="s0"':''}><td>${nom(x.a)}</td><td class="num">${x.q?n0(x.q):'–'}</td><td class="num">${s==null?'–':s<=0?'<span class="chip-s nost">Sin stock</span>':n0(s)}</td><td class="num">${celda(x)}</td></tr>`; }).join('')}</tbody></table>`:''}
     ${inc.length?`<h3 class="sm-h">Productos a Incorporar</h3>${tabla(inc,'Elegido')}`:''}
-    <details class="sm-all"><summary>Stock de todo el portafolio OTC (${todos.length} productos${sin.length?`, ${sin.length} sin stock`:''})</summary>
-      <table class="ptab sm"><thead><tr><th>Producto</th><th>En Mega</th></tr></thead><tbody>${todos.map(a=>`<tr><td>${nom(a)}</td><td class="num">${(smU(a)||0)>0?`<b class="num">${n0(smU(a))}</b>`:'<span class="chip-s nost">Sin stock</span>'}</td></tr>`).join('')}</tbody></table></details>
-    <span class="small">Unidades disponibles en D4 al ${esc(S.fecha)}. El stock cambia con los pedidos de cada día: es una referencia para ofrecer, no una reserva.</span>
+    <details class="sm-all"><summary>Stock de todo el portafolio OTC (${todos.length} productos${sin.length?`, ${sin.length} sin stock`:''}${sd.length?`, ${sd.length} sin dato`:''})</summary>
+      <table class="ptab sm"><thead><tr><th>Producto</th><th>En Mega</th></tr></thead><tbody>${todos.map(a=>`<tr><td>${nom(a)}</td><td class="num">${smU(a)==null?'<span class="chip-s">Sin dato</span>':smU(a)>0?`<b class="num">${n0(smU(a))}</b>`:'<span class="chip-s nost">Sin stock</span>'}</td></tr>`).join('')}</tbody></table></details>
+    <span class="small">Unidades disponibles en D4 al ${esc(S.fecha)}.${sd.length?' «Sin dato»: el archivo de stock no trae ese producto.':''} El stock cambia con los pedidos de cada día: es una referencia para ofrecer, no una reserva.</span>
   </section>`;
 }
 
@@ -1533,7 +1572,7 @@ function bajaRotacion(f){
     if(!P[p.art]||!p.u_cadena) return;
     const exp=p.u_cadena*sc; if(exp<3) return;
     const idx=(p.u||0)/exp; if(idx>=0.5) return;
-    items.push({a:p.art, act:p.u||0, exp, idx, nolist:!p.listado, per:'en agosto'});
+    items.push({a:p.art, act:p.u||0, exp, idx, nolist:!p.listado, per:'en '+PR.so});
   });
   items.sort((x,y)=>(y.exp-y.act)-(x.exp-x.act));
   return rotHTML(items.slice(0,10), `Comparado con las ${k.n_suc||''} sucursales de ${esc(TIPO[f.tipo])}, ajustado a lo que suele vender esta sucursal. Sell-Out ${D.corte.cadenas}.`);
@@ -1567,7 +1606,7 @@ function desvioBrick(f){
   const C=incCalc(f);
   if(!C) return `<div class="empty">No hay datos de CloseUp para el brick de este punto de venta.</div>`;
   const {L, esF}=C, per=esF?'al año':'por mes';
-  const estado=x=> esF ? (x.ult?`Última compra: ${fdate(x.ult)} (hace ${n0(x.dias)} días al ${D.corte.venta_real})`:'Nunca lo compró desde enero de 2025')
+  const estado=x=> esF ? (x.ult?`Última compra: ${fdate(x.ult)} (hace ${n0(x.dias)} días al ${D.corte.venta_real})`:'Nunca lo compró desde '+PR.desde)
     : (x.listado===false?'No está listado en esta sucursal':`Listado sin ventas en ${perSO()}${x.stock!=null?` · stock ${n0(x.stock)}`:''}`);
   INC_ROWS=L.map(x=>x.a);
   const Q=incQ(f), nm=a=>esc(P[a].n);
@@ -1741,10 +1780,10 @@ const MES3={enero:'ene',febrero:'feb',marzo:'mar',abril:'abr',mayo:'may',junio:'
 const MESN={ene:'enero',feb:'febrero',mar:'marzo',abr:'abril',may:'mayo',jun:'junio',jul:'julio',ago:'agosto',sep:'septiembre',oct:'octubre',nov:'noviembre',dic:'diciembre'};
 const perCU=()=>'año móvil a '+String(D.corte.closeup).replace(/\s*\(MAT\)/,'');
 const perSO=()=>{ const m=String(D.corte.cadenas).match(/^(\w{3})-(\d{2})$/); return m?(MESN[m[1]]||m[1])+' 20'+m[2]:String(D.corte.cadenas); };
-const VR_YTD='ene–ago 2026';
+let VR_YTD='';
 function perAlerta(a){
   const d=String(a.detalle||'');
-  if(a.tipo==='caida'||a.tipo==='crece'){ const m=d.match(/^(\p{L}+)–(\p{L}+) (\d{4})/u); return m?`${MES3[m[1].toLowerCase()]||m[1]}–${MES3[m[2].toLowerCase()]||m[2]} ${m[3]} vs. ${m[3]-1}`:VR_YTD+' vs. 2025'; }
+  if(a.tipo==='caida'||a.tipo==='crece'){ const m=d.match(/^(\p{L}+)–(\p{L}+) (\d{4})/u); return m?`${MES3[m[1].toLowerCase()]||m[1]}–${MES3[m[2].toLowerCase()]||m[2]} ${m[3]} vs. ${m[3]-1}`:VR_YTD+' vs. '+PR.Y0; }
   if(a.tipo==='dejo'){ const m=d.match(/entre (\p{L}+) y (\p{L}+) de (\d{4})/u); return m?`${MES3[m[1]]||m[1]}–${MES3[m[2]]||m[2]} ${+m[3]+1} vs. ${m[3]}`:'últimos meses'; }
   if(a.tipo==='sin_compra') return 'al '+D.corte.venta_real;
   if(a.tipo==='share') return perCU()+' vs. año anterior';
@@ -1762,12 +1801,12 @@ const srcLbl=s=>String(s||'').split(' · ').map(t=>{ t=t.trim();
   return t; }).join(' · ');
 const fechaH=s=>{ const m=String(s||'').match(/^(\d{1,2})\/(\d{2})\/(\d{4})$/); const L=Object.values(MESN); return m?`${+m[1]} de ${L[+m[2]-1]} de ${m[3]}`:s; };
 function fuenteHablada(f){
-  const cu='CloseUp, con el año móvil a '+(MESN[(String(D.corte.closeup).match(/^(\w{3})/)||[])[1]]||'julio')+' de 2026';
+  const cu='CloseUp, con el año móvil a '+PR.cuMes+' de '+PR.cuY;
   return esFarmacia(f)? `Fuentes: Venta Real, con datos al ${fechaH(D.corte.venta_real)}, y ${cu}.` : `Fuentes: ventas de la cadena de ${perSO()}, y ${cu}.`;
 }
 (function(){
   const gF=guionFarmacia; guionFarmacia=f=>{ const S=gF(f); S.push({t:fuenteHablada(f)}); return S; };
-  const gR=guionRuta; guionRuta=()=>{ const S=gR(); S.splice(Math.max(0,S.length-1),0,{t:`Fuentes: Venta Real, con datos al ${fechaH(D.corte.venta_real)}; CloseUp, con el año móvil a julio de 2026; y ventas de las cadenas de ${perSO()}.`}); return S; };
+  const gR=guionRuta; guionRuta=()=>{ const S=gR(); S.splice(Math.max(0,S.length-1),0,{t:`Fuentes: Venta Real, con datos al ${fechaH(D.corte.venta_real)}; CloseUp, con el año móvil a ${PR.cuMes} de ${PR.cuY}; y ventas de las cadenas de ${perSO()}.`}); return S; };
 })();
 
 // ---- v1.34 · Experiencia de usuario: movimiento suave, respuesta al toque, bienvenida, recientes y barra fija del pedido.
@@ -2107,6 +2146,7 @@ details.navd[open] .navl{margin-top:8px}
 .nb{display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:0 11px;border-radius:999px;border:1px solid var(--edge);background:#fff;color:var(--tq-text);font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap}
 .nb:active{transform:scale(.96)}
 .nb svg{flex-shrink:0}
+.nb.wz{background:#EAF6FB;border-color:#B9DEEC}
 .pnav{margin-top:6px}
 .rb-nav{margin-top:6px;align-items:center}
 .rb-nav>span{font-size:12.5px;color:var(--muted);margin-right:2px}
@@ -2134,13 +2174,13 @@ function gmRuta(fs){
   return T.map((t,k)=>{ const q=t.map(f=>navLugar(f).q), dest=q[q.length-1], wp=q.slice(0,-1);
     return {desde:k*10+1, hasta:k*10+t.length, url:'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(dest)+(wp.length?'&waypoints='+encodeURIComponent(wp.join('|')):'')}; });
 }
-const navLinks=f=>`<a class="nb" href="${esc(wzUno(f))}" target="_blank" rel="noopener" aria-label="Ir con Waze a ${esc(f.nombre)}">${INAV}Waze</a><a class="nb" href="${esc(gmUno(f))}" target="_blank" rel="noopener" aria-label="Ir con Google Maps a ${esc(f.nombre)}">${IPIN}Maps</a>`;
+const navLinks=f=>`<a class="nb wz" href="${esc(wzUno(f))}" target="_blank" rel="noopener" aria-label="Ir con Waze a ${esc(f.nombre)}">${INAV}Ir con Waze</a>`;
 function navCard(fs){
-  const T=gmRuta(fs), todas=fs.every(navExacta);
-  return `<section class="sec navc"><div class="sec-h"><h2>Cómo llegar</h2><span class="src">Google Maps · Waze</span></div>
-    ${T.map(t=>`<a class="btn" href="${esc(t.url)}" target="_blank" rel="noopener">${IRUTA}${T.length>1?`Google Maps · paradas ${t.desde} a ${t.hasta}`:'Abrir la ruta en Google Maps'}</a>`).join('')}
-    <span class="small" style="margin-top:-4px">Sale desde donde estás y sigue el orden de las ${fs.length} paradas. Waze no acepta varias paradas: abrilas de a una abajo.</span>
-    <details class="navd"><summary>Parada por parada (Waze o Maps)</summary><ol class="navl">${fs.map((f,i)=>`<li><span class="rn">${i+1}</span><span class="t"><b>${esc(f.nombre)}</b><small>${Z[f.brick]?esc(zonaCorta(f.brick).split(/\s*-\s*/)[0])+' · ':''}${esc(f.depto||zonaDepto(f.brick)||'')}</small></span><span class="ac">${navLinks(f)}</span></li>`).join('')}</ol></details>
+  const todas=fs.every(navExacta);
+  return `<section class="sec navc"><div class="sec-h"><h2>Cómo llegar</h2><span class="src">Waze</span></div>
+    ${fs.length?`<a class="btn" href="${esc(wzUno(fs[0]))}" target="_blank" rel="noopener">${IRUTA}Ir con Waze a la parada 1</a>`:''}
+    <span class="small" style="margin-top:-4px">Waze navega de a una parada: al terminar cada visita, tocá «Ir con Waze» en la siguiente.</span>
+    <ol class="navl">${fs.map((f,i)=>`<li><span class="rn">${i+1}</span><span class="t"><b>${esc(f.nombre)}</b><small>${Z[f.brick]?esc(zonaCorta(f.brick).split(/\s*-\s*/)[0])+' · ':''}${esc(f.depto||zonaDepto(f.brick)||'')}</small></span><span class="ac">${navLinks(f)}</span></li>`).join('')}</ol>
     ${todas?'':`<span class="small">Las paradas se buscan por nombre y barrio: confirmá en el mapa que sea el local correcto antes de salir. Con las direcciones cargadas, la ruta queda exacta.</span>`}
   </section>`;
 }
@@ -2324,16 +2364,16 @@ const r1=v=>v==null?null:Math.round(v*10)/10, r0=v=>v==null?null:Math.round(v);
 function farmaDetail(f){
   const d={id:f.id,nombre:f.nombre,tipo:TIPO[f.tipo],brick:f.brick||null,zona:f.brick?zonaCorta(f.brick):null,zona_erp:f.zona_erp||null,ruta:f.ruta||null};
   d.alertas=(f.alertas||[]).map(a=>`[${a.nivel}] ${a.titulo}: ${a.detalle} (${a.fuente})`);
-  if(f.sin_datos){ d.nota='Sin compras registradas en Venta Real desde ene-2025.'; return d; }
+  if(f.sin_datos){ d.nota=f.central?(TIPO[f.tipo]||f.tipo)+' compra por la central de la cadena: no hay compras ni sell-out por sucursal.':'Sin compras registradas en Venta Real desde '+PR.desde+'.'; return d; }
   const k=f.kpi;
   if(esFarmacia(f)){
-    d.compras={otc_ene_ago_2026:k.otc_ytd26,otc_ene_ago_2025:k.otc_ytd25,var_pct:k.otc_var,ult_trim_2026:k.otc_q26,var_trim_pct:k.otc_q_var,ultima_compra_otc:k.ult_otc,dias_sin_compra_otc:k.dias_otc,total_megalabs_2026:k.total_ytd26,var_total_pct:k.total_var};
-    d.marcas=(f.marcas||[]).filter(m=>(m.v26||0)||(m.v25||0)).map(m=>({marca:marca(m.marca),compras_2026:m.v26,var_pct:m.var,peso_farmacia_pct:m.mix,peso_zona_pct:m.mix_zona}));
+    d.compras={periodo:PR.ytd,otc_periodo:k.otc_ytd26,otc_mismo_periodo_anio_anterior:k.otc_ytd25,var_pct:k.otc_var,ultimo_trimestre:PR.q+' '+PR.Y,otc_ult_trim:k.otc_q26,var_trim_pct:k.otc_q_var,ultima_compra_otc:k.ult_otc,dias_sin_compra_otc:k.dias_otc,otc_12_meses:k.otc_12m,periodo_12_meses:PR.m12};
+    d.marcas=(f.marcas||[]).filter(m=>(m.v26||0)||(m.v25||0)).map(m=>({marca:marca(m.marca),compras_periodo:m.v26,var_pct:m.var,peso_farmacia_pct:m.mix,peso_zona_pct:m.mix_zona}));
     d.dejo_de_comprar=(f.productos||[]).filter(p=>p.estado==='dejo').map(p=>P[p.art].n);
     d.top_productos_12m=(f.productos||[]).filter(p=>p.u12>0).sort((a,b)=>b.u12-a.u12).slice(0,10).map(p=>`${P[p.art].n}: ${p.u12} unid. (última hace ${p.dias} d)`);
   } else {
-    d.sellout_agosto={unidades:k.unid,venta_sin_iva:k.venta,indice_vs_sucursal_promedio:k.indice,puesto:k.rank,de:k.n_suc};
-    d.top_productos_agosto=(f.productos||[]).filter(p=>p.u>0).sort((a,b)=>b.u-a.u).slice(0,10).map(p=>`${P[p.art].n}: ${p.u} unid.${p.stock!=null?' stock '+p.stock:''}`);
+    d.sellout_mes={mes:PR.soY,unidades:k.unid,venta_sin_iva:k.venta,indice_vs_sucursal_promedio:k.indice,puesto:k.rank,de:k.n_suc};
+    d.top_productos_mes=(f.productos||[]).filter(p=>p.u>0).sort((a,b)=>b.u-a.u).slice(0,10).map(p=>`${P[p.art].n}: ${p.u} unid.${p.stock!=null?' stock '+p.stock:''}`);
     if(f.tipo==='FARMASHOP') d.sin_stock=(f.productos||[]).filter(p=>p.listado&&(p.stock||0)<=0&&p.u_cadena>=1).map(p=>P[p.art].n);
   }
   d.pedido_sugerido=(f.pedido||[]).map(q=>`${q.tipo}: ${P[q.art].n}${q.cant!=null?' x'+q.cant:''} (${q.motivo})`);
@@ -2341,8 +2381,8 @@ function farmaDetail(f){
 }
 function brandSummary(f,b){
   const x=brandCtx(f,b), s={marca:marca(b),punto_de_venta:f.nombre};
-  if(esFarmacia(f)&&x.u26!=null) s.en_la_farmacia={unidades_ene_ago_2026:x.u26,unidades_ene_ago_2025:x.u25,compras_2026:r0(x.v26),compras_2025:r0(x.v25),ultima_compra:x.ult,dias:x.dias,meses_con_compra_12:x.meses12,presentaciones_12m:x.sk.map(a=>`${P[a].n}: ${(x.perSku[a]||{u12:0}).u12}`)};
-  if(!esFarmacia(f)&&x.ps) s.en_la_sucursal_agosto={unidades:x.uS,promedio_cadena:r1(x.uC),indice:r0(x.idx),sin_stock:x.sinStock.map(p=>P[p.art].n)};
+  if(esFarmacia(f)&&x.u26!=null) s.en_la_farmacia={periodo:PR.ytd,unidades:x.u26,unidades_mismo_periodo_anio_anterior:x.u25,compras:r0(x.v26),compras_mismo_periodo_anio_anterior:r0(x.v25),ultima_compra:x.ult,dias:x.dias,meses_con_compra_12:x.meses12,presentaciones_12m:x.sk.map(a=>`${P[a].n}: ${(x.perSku[a]||{u12:0}).u12}`)};
+  if(!esFarmacia(f)&&x.ps) s.en_la_sucursal_mes={mes:PR.soY,unidades:x.uS,promedio_cadena:r1(x.uC),indice:r0(x.idx),sin_stock:x.sinStock.map(p=>P[p.art].n)};
   if(x.row){
     const T=x.C.tot;
     s.en_la_zona={categoria:catName(x.cat),otras_categorias:x.cats.filter(c=>c!==x.cat).map(catName),share_anio_movil:r1(x.sh[0][1]),share_anio_anterior:r1(x.sh[0][0]),share_ultimo_trimestre:r1(x.sh[1][1]),share_trimestre_anio_ant:r1(x.sh[1][0]),share_ultimo_mes:r1(x.sh[2][1]),mercado_categoria_mat:x.mkt,crec_mercado_pct:r1(x.mktG),unidades_marca_mat:x.brU,crec_marca_unid_pct:r1(x.brUG),puesto:x.rank,de:x.nRank,
@@ -2357,11 +2397,11 @@ function zonaSummary(b){
   const z=Z[b]; if(!z) return {error:'Brick no encontrado'};
   return {brick:b,zona:zonaCorta(b),share_megalabs_otc:z.share_meg,share_promedio_cartera:D.share_cartera,
     categorias:z.cats.slice(0,10).map(c=>({categoria:catName(c.cat),mercado_mat:c.mercado,crec_pct:c.crec,marcas:c.marcas.filter(m=>m.share>0).map(m=>`${marca(m.marca)} ${m.share}% (${m.delta_pp>0?'+':''}${m.delta_pp} pp)`),lider:c.top[0]?`${c.top[0].producto} ${c.top[0].share}%`:null,competidor_que_mas_gana:c.riser?`${c.riser.producto} ${c.riser.delta_pp} pp`:null})),
-    cadenas:(z.cadenas.sucursales||[]).map(s=>`${s.nombre}: ${s.unid} unid. ago`)};
+    cadenas:(z.cadenas.sucursales||[]).map(s=>`${s.nombre}: ${s.unid} unid. ${PR.soC}`)};
 }
 function carteraLines(){
   return F.map(f=>{ const k=f.kpi||{}; const al=(f.alertas||[]).filter(a=>a.nivel!=='positiva').map(a=>a.titulo).join('; ');
-    const m = f.sin_datos ? 'sin datos' : esFarmacia(f) ? `OTC ene-ago26 $${r0(k.otc_ytd26)} (${k.otc_var==null?'s/d':(k.otc_var>0?'+':'')+r0(k.otc_var)+'%'}), ${k.dias_otc==null?'sin compras OTC':k.dias_otc+' d sin comprar OTC'}` : `ago ${k.unid} unid., índice ${k.indice}`;
+    const m = f.sin_datos ? 'sin datos' : esFarmacia(f) ? `OTC ${PR.ytdC} $${r0(k.otc_ytd26)} (${k.otc_var==null?'s/d':(k.otc_var>0?'+':'')+r0(k.otc_var)+'%'}), ${k.dias_otc==null?'sin compras OTC':k.dias_otc+' d sin comprar OTC'}` : `${PR.soC} ${k.unid} unid., índice ${k.indice}`;
     return `${f.id} | ${f.nombre} | ${TIPO[f.tipo]} | ${f.brick?f.brick+' '+zonaCorta(f.brick):'sin brick'} | ${m} | ${al||'sin alertas'}`; }).join('\n');
 }
 const hoy=()=>new Date().toLocaleDateString('es-UY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -2372,7 +2412,7 @@ function rulesTurn(){
 Reglas:
 - Español rioplatense, directo y accionable. Máximo 6 líneas o 5 viñetas cortas ("- "). Usá **negrita** solo para lo clave.
 - Usá SOLO los datos de abajo (incluidos los DATOS ADICIONALES, si vienen). Si un dato no está, decilo; no inventes cifras.
-- Cuando des una cifra, aclará SIEMPRE el período o la fecha y la fuente entre paréntesis, por ejemplo (Venta Real, ene–ago 2026), (CloseUp, año móvil a jul-26) o (Sell-Out Farmashop, ago-26). Fuentes: Venta Real (compras de la farmacia a Megalabs, $ netos y unidades, al ${D.corte.venta_real}), CloseUp (mercado por brick: año móvil, último trimestre y mes a jul-26, contra el año anterior) o Sell-Out (ventas de Farmashop y San Roque, ago-26).
+- Cuando des una cifra, aclará SIEMPRE el período o la fecha y la fuente entre paréntesis, por ejemplo (Venta Real, ${PR.ytd}), (CloseUp, año móvil a ${String(D.corte.closeup).replace(/\s*\(MAT\)/,'')}) o (Sell-Out Farmashop, ${D.corte.cadenas}). Fuentes: Venta Real (compras de la farmacia a Megalabs, $ netos y unidades, al ${D.corte.venta_real}), CloseUp (mercado por brick: año móvil, último trimestre y mes a ${String(D.corte.closeup).replace(/\s*\(MAT\)/,'')}, contra el año anterior) o Sell-Out (ventas de Farmashop y San Roque, ${D.corte.cadenas}).
 - Celsius, Spefar, Servimedic, Haymann y Dispert son del Grupo Megalabs: no son competencia.
 - Si la pregunta es ambigua, respondé lo más probable y ofrecé en una línea la alternativa.
 Contexto: ${ctx} Hoy es ${hoy()}.
@@ -2391,7 +2431,7 @@ const numTok=t=>/^\d+$/.test(t)?String(parseInt(t,10)):t;
 const qTokens=q=>new Set(norm(q).split(' ').filter(Boolean).map(numTok));
 function detectFarms(q){
   const qt=qTokens(q), nq=' '+norm(q)+' ', out=[];
-  const cadena={FARMASHOP:/ farmashop /,'SAN ROQUE':/ (san roque|roque) /,NATAL:/ natal /};
+  const cadena={FARMASHOP:/ farmashop /,'SAN ROQUE':/ (san roque|roque) /,NATAL:/ natal /,'EL TUNEL':/ tunel /,PIGALLE:/ pigalle /};
   F.forEach(f=>{
     const tk=norm(f.nombre).split(' ').map(numTok).filter(t=>t&&!STOPW.has(t)&&(t.length>=3||/^\d+$/.test(t)));
     if(!tk.length) return;
@@ -2428,7 +2468,7 @@ function extraContext(q){
   const brands=detectBrands(q).slice(0,2), target=farms[0]||cur;
   brands.forEach(b=>{
     if(target&&!(screen==='marca'&&target===cur&&b===curBrand)) parts.push(`MARCA ${marca(b)} EN ${target.nombre}:\n`+JSON.stringify(brandSummary(target,b)));
-    parts.push(`MARCA ${marca(b)} EN CADA ZONA DE LA CARTERA (CloseUp, año móvil a jul-26):\n`+brandCartera(b));
+    parts.push(`MARCA ${marca(b)} EN CADA ZONA DE LA CARTERA (CloseUp, año móvil a ${PR.cuC}):\n`+brandCartera(b));
   });
   const bricks=detectBricks(q).filter(b=>!cur||String(cur.brick)!==b||screen==='menu').slice(0,2);
   bricks.forEach(b=>parts.push(`ZONA ${b}:\n`+JSON.stringify(zonaSummary(b))));
@@ -2452,7 +2492,7 @@ function ctxLabel(){ if(screen==='ruta'&&RUTA_NAV) return 'Ruta del '+fechaLarga
 function suggestions(){
   if(screen==='marca'&&cur){ const m=marca(curBrand); return [`¿Qué presentación de ${m} le propongo?`,`¿Cómo viene ${m} en esta zona contra la competencia?`,`¿Por qué cambiaron sus compras de ${m}?`]; }
   if(screen==='ruta'&&RUTA_NAV) return ['¿En qué farmacia de la ruta hay más oportunidad?','¿Qué pedido llevo para cada farmacia?','Resumime la ruta en 5 puntos'];
-  if(screen==='farm'&&cur) return ['¿Qué le ofrezco hoy a esta farmacia?','¿Por qué cambiaron sus compras?','Resumime la visita en 3 puntos'];
+  if(screen==='farm'&&cur) return ['¿Qué le ofrezco hoy a esta farmacia?','¿Por qué cambiaron sus compras?','Resumime en 3 puntos lo que sí o sí tengo que atender en esta visita'];
   const base=['¿Qué farmacias tengo que priorizar esta semana?','¿Cuáles dejaron de comprar OTC?','¿Qué zona tiene más oportunidad para Dolex?'];
   return (rutaCtx()?['¿Qué tengo que mirar en cada farmacia de mi ruta?']:[]).concat(base).slice(0,3);
 }
@@ -2654,7 +2694,7 @@ $send.addEventListener('click',()=>{ if(ASK.sr){ stopRec(false); return; } if($i
 function syncAskBar(){ if(screen==='login'||screen==='carga') closeSheet(); else if(!$sheet.hidden) $('#askCtx').textContent='Sobre: '+ctxLabel(); }
 
 // ---- Arranque
-const APP_VERSION='1.39';
+const APP_VERSION='1.41';
 document.querySelectorAll('.powered').forEach(el=>el.insertAdjacentHTML('beforeend',`<span class="ver" style="opacity:.55;font-size:12px">· v${APP_VERSION}</span>`));
 async function arranque(){
   if('serviceWorker' in navigator && (location.protocol==='https:'||/^(localhost|127\.0\.0\.1)$/.test(location.hostname))){
