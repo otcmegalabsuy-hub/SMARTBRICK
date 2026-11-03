@@ -1,61 +1,96 @@
 {
  "version": 1,
- "generado": "2026-10-20T18:22Z",
+ "generado": "2026-11-02T19:53Z",
  "usuarios": [
   {
    "nombre": "Andrés Coppola",
    "rol": "vendedor",
-   "sinDatos": true
+   "salt": "LkSS+pCcxT67MYxM/E4rZQ==",
+   "iter": 600000,
+   "iv": "VwuIb1KV3QZ0aIYH",
+   "ct": "3mlDgrLtXWi7ez2PHSVK4sJ/S0pSr8bJzZpjdhA9PeX6MgcSv8CzW8tEVyIfxI309c5YUp/eKkVdL+SEIpMcraqF2S65YIOYEZ/+gbJx85OtABQ5YJ/K33HQFSItjXR+7jNKCzUAafybPgCJyOLPocIJPq4LJALlXTRjCrpFqfN5WUvdm9+cPYgU9iLICae6E5No4ujHH6n1WrbBbzHhs+3SUJVPhUCTa0U+Tp6HmpPu5IpGsN2UUB9kuibWVBkv6HngfiwxRxXEJv9UWHkNkaaduSnDV4S1Q4pHDvF9Md7FfKR21XIP/1VYyfm6RB7snWGblnY="
   },
   {
    "nombre": "Diego Matkovich",
    "rol": "vendedor",
-   "sinDatos": true
+   "salt": "n/b8JpYKjlyWHY32feCwvw==",
+   "iter": 600000,
+   "iv": "rW3ZCs/9z2KAKZCD",
+   "ct": "tGCGNcZ6b6hWW4he7NyYL9i2BRp5xJWx6jkGJ2zvPLyob/eC/BkiUp9OHKxrZy09b22Kb87f2PfaLt2omh0gyvkZhX7Z4tZfAuZFy+YMsC1SpWIpDgk/o+Bo/MiRZKB2vUm9LvYg2qveETEmsk/jqrTq6hqSBE6wUYxSytlUarG+LKBjzsyB9a3OJ54VHbFV8f8utR/96RV5sqyJQDtuhXpiietm71+vPBV7kdtG6C95iRiieZVE1IsEQI8/HGq7ZcxEJeecVF0cEC6/M7nku0traeFcRh9gyaZ4f668Z1WetNeVfE+eHO7bFKcmN7vmzzPheqXd"
   },
   {
    "nombre": "Federico Bello",
    "rol": "vendedor",
-   "sinDatos": true
+   "salt": "V4NAdZFtKXSApKI1imOLJw==",
+   "iter": 600000,
+   "iv": "tcSwr6UvCUlsI6Nc",
+   "ct": "5ysTkYW8IjCRsH346VqN8cq2ZUZcSily40zuexejFIkRiESd1Wa5uobMAwOzwCfbSqzID1cUhZWihwp9GWhos109bRZO34mfSwMnWjARo08Zu4+VYJYRoWX4BOjB1jCeA+F7UkO3gm/zTLMKZUNyXhuF3ypaWAHRgCG5qUPGKQz3K+bFYNYSMOD36VeVtDegjkpAMkIzOdiY/jEKnug8LXSlBJ0jG90Uy613F9yD4I9v1lrhplmt9WD5LoQGqc7Euicy712kR/5miiSBNStrgR3DmKdwAQJF+4bE68ub4oJu9vacEkXcRT12J4qPm1E3p7sk"
   },
   {
    "nombre": "Matías Plada",
    "rol": "vendedor",
-   "sinDatos": true
+   "salt": "eEtChr78UB+60yEKqR6ynA==",
+   "iter": 600000,
+   "iv": "4bFo05PyE+qNyxya",
+   "ct": "E9RCn4Pe3bLRMOtx7DEDZwrPlQSZotXU9/l5m9xl/hKfJOAaJUNv1FzXPuTLeLaJ0A/VUwRpfb7yvFZDScivabWH1VDluwFLvPAE3OWC1JJayEE5A6u3Z9rWEa+Gdrj1cQwzqfYxfM5+RKz28bkjiGkEESRl2qMRxjSQRqlet1LJRJqVn7gTVfB/AEurOvYBEU5z9cCkStTGCA3IjTfMlmArGsVnonkbX3dJyWh+87xMh+w2GF+skabDiyW1KwoeYorU+efNbF0M3yR33gaFsmXjqelc0dipCZ2Z9ubM1hyhctcb9JQ6190hpsRo3r8="
   },
   {
    "nombre": "Marcelo Scarpa",
    "rol": "vendedor",
-   "sinDatos": true
+   "salt": "PPZdQR9t+riZi5anDIn9rA==",
+   "iter": 600000,
+   "iv": "gFoqhvcl3Xnb3SjI",
+   "ct": "zqUSanE8NGGRXWRDxGmHsCxpqabu6Ud8fkaTjtkvez3yfl1GPYu/juOXN5zt2fTxSXSwHQvWpuF+Us4Cr77qeZN5S+kNzLhemwg96Oy9TI2tTlbHKLpQvrJQpxlfvbunRBzNItKdH4T6R76yr0/SbE4q9uNvjsjRkmqwHv2U55A5kUXShtc7SnHPEZlpVu0w4vsOTwlqYdAklWiKuWa6vJWLqVAZIXNTMUVCKItkL8lKNLgl2YBJELGkT0ma6P8KO0cjHrQ2cJr0iQTlNZGQrp1jv8lj+ufzQ9BhdseceVldt7dXaGZot1BWA7mvwkNdxbvF"
   },
   {
    "nombre": "Pablo Villasante",
    "rol": "vendedor",
-   "salt": "6GqLt1c0efd0b4NedwJDNA==",
+   "salt": "7L/oHMR7YDRg7fUMtB76pw==",
    "iter": 600000,
-   "iv": "wG32L8bAmkzfyfGp",
-   "ct": "SK47gCjZl13d9qWGkDoIF57G+JclBU0Gk41yISJVoDRLmbFz8DGjsBUfo8kQhNN2N9dw5P4TYZfD9+onE4zMlxiVJVL9tv3SyYvec0aaengci54GN4iuoFoFVNXMl9Mxdf0KdJIHFaqR7six4GxfSoXFVT+XYw4RlySDHNFnuU+Xg1xldgBrpCSpt1B8ta4mbfpxb5epgiVoODAd79Z1zYKPRROAZtEwGaskrQCXmcTMVLtYKVrj/QgLD0rfwSaOKQZX2i1SPL2gVf2W2ICEJlk+6ZS++hW/jpTohfq48yym97HoiJoNatbzZJy9ERoFigATcrJw8pyf"
+   "iv": "zA712tbNXkIekv7U",
+   "ct": "BJafi5Dx8PN4B3JwKsMkVqJam0IrZ9bBY/xprf0PIP4f/yCovo3nCgJ/eHNzXObqMkHkyAZ/7jQvGsavx48Esoh9n+t1upgwGLelQNbtUa6c1dnNajLvRQhmMrTZLjipQsCUUf6313bqgV2itHC+8+8y4GftAKznV/DZnFoj3Pg/aGOjeVcBymc4zWXeHv9X8MJnZlbYGLSGyw6atGX9C61UCMg0MsMLFhpaYOz26tO+e+/Z8buzTPNFgYc6HaQ5/KO8ZC5eOD6eKBC/HyPTymsTeZX5DeUUyuoDRyVxOuwSOl55wxq0D+tw78+FC88nYuq9FLFBfgsK"
   },
   {
    "nombre": "Gerencia Comercial",
    "rol": "jefe",
-   "salt": "WQ+dBD0Xz98sRI9KKJ5bLg==",
+   "salt": "w7o4XyrNhGcCvW3dkGzefg==",
    "iter": 600000,
-   "iv": "25SO1NxyAoWY96Av",
-   "ct": "NdQbB8St3uBf/mdpwKfUHG4SiTNhCC/bWw+nIYCtASk+9LTArZTcDVsIdG5f9z6xTc4gxF48aGNpR8G46NbZNuz6zTkjK6pCoPjSqxx2VUl9oSfuIMJ2dDj8sU1smJ/qjapFko7VlD4C4jpKW6U0BXdebv9B1PYUcw5zkyHNcqKE4AZZPx2F2BrLI4Aq1pz016hxlcU4v3/GkjJ/kr7xDn5kcn7PbD3HWWUzNNS5DYgzJ3PY6NoeEZ8VxSutzbyaTHM2q5Ga6w8EwR9lUiPH/wdtxw5CAkr+fiqO6hH1z1oe+BTp7OorJ3cJkUaygVyZ9B9aMPm5Mw=="
+   "iv": "7IWJ13iAqpe1llMJ",
+   "ct": "0Vd4uEXUi0oaJPxcSbbSsxoMN5hM6n9rNiSgHbczYQs0Vn3pKJiJG2NkypbTpSYPnZTbeVaBrV76Ya+cnaYGIcmUOaUBFRj5FQqq1XXvFuiMIvSqk6YfsrcIrfhlBq+8SrN4DhrS0ug/jxQRCaTKpbm63MF221kcbHd4mcH1ukypnoS1fF8l6Wx/agQE7cyERDNfjv6FDCESKRQufXS7ekrkE7HDYzn0vnsXEkxRg/tkUoH7qNdHXDmgkFhdEHmZX1DVdR5tAHtHHDoG9FaznyyXyR0Kd/QLihW5tSxXFWvAWldPzG3qB9PstFLip+Ocvbj/08i7clOLnIJU5NJbcR5TVI8pcvSDU88A2+qmN8VdkQI1Ecv2uAQbrtTusRWuUin358JswbfDB9lfxEFBEdHIqHzCDUr2qD/+7APeNFeW02bnRk51uvXCUVexHLQf3csBzIqceU/wVwdAdEM7bJoIEJZ5Y/Hav3gGtskUAVtR5SRKlxVj32Kf988UdbiW9ApdWboQu/MgelfhhFdx2bROj+16cb5Ia6qQT84LHWhZsyzXKcRhthL+Y/wDH/MH5E2eFRv9OyS+2HDRyZ+bwzhgq/CYIZnZU2Yltqi8BtP/bxlq5B+z2e4oDwOyO2p9moEUWHKxIonQvdQVf/3Dyf3BLnvWU4eP1RUOsJCHQ1Cw7xp8mMXHtgzjlHuozf/YnrPGWP3o79zFuXNdAX2QdwCKVuuuYUkRbl7B9blA5KFILjoV27SCFtHDP7n0ZDOLdhbE54DN2ZBG+GEAmFJEfBYBabYEDmM+xneZb6dwqnADpVX7W9NdoA88BzbsWVzPObDhocfkCpbXFdju1sK5/yzLv2TxntRZHcqKUEAIwZH/mCffnkjglpFoXhf0O6AEpJOzq2V3/lKqn546iZtpa6FZ1ETFEOiaCQmQhez1IkpR1stQ7RCKtkz+gK80w9pMWklCFZuOxVArW06+nAtzceq3hz5AisqQwOr+QS+xa/vOZ/cD9ET5OjH/LXLzID+h4+fYUewZIjd8BxOvNKq9+3/J/4dC3QlviZ1Boyb+Bj/WMpEI4Pmiz8Hn8w0="
   },
   {
    "nombre": "Marketing OTC",
    "rol": "admin",
-   "salt": "LWnfIr6jE1xFZAQz86GrHw==",
+   "salt": "Bn7cU66fnapdQsnCYhBiPQ==",
    "iter": 600000,
-   "iv": "3qrkmnHLVlAxvESo",
-   "ct": "HSWXaGifGEOrUsAs8Rcv8MkAhuYRZxfXbXPcJT79kQew0Nies2k+w4NkCpw8nBBYssJjCNKV0kQvPIZAbcDBrWmh2XSktls236cayms+1oyhv9ZTkyfRU3dU4gP72NfZzTZUWzMh6t6ANiG5DGWyBCfah0WbPrM79BMx5oRDtvEQhKIO0jzfiXoyflAHvtZhXmrqcr/xleKfYf1QnmUGsCLIn/KnXs9fw6P6pEUkIUxFKcsWuwx++7eSAkrJZppA2QaLVHFOvqWHefgEQOzgrqqgUvZ8EHmRYV03q+B08DXHF49eh/M2fUuCEOCnu9/IuMnV"
+   "iv": "bLPaMr4BJJYMJWg8",
+   "ct": "15l/VM9MZX0YGtzfT4HJZYR3qmZaxMWHlQNL8Zxv0vutiWkZHyVyshL+z4N+576dCFBNgaU/TPVWDWs0fqdj53C5hyPTdiO3FhjFnLu83uq7N0HujN2mGtx6xJe1cidkLeFOrT0r67xKfOS6/gaJoLjw+QVbS+freLGTzZhlTEJAl8Frj7aRH4LS4teAZB2ua0C6F1zwVCQn5VwNUW4Af4MXA9c36CEg0PfzVgEBUuofKO76W3KTPqYYP51XqFaB14hrEJ+4vvhN/TVqkPamTiMsfAOgrP4T714Il9D38H6pH42CbUWBAWmh5kT3POrfBWIlcTeYw2aCj1ZKMzYCX7cRSdt1atAOlJINkB4SQXm/N+jVAUHCY4TKqeZT77LaH+AVy/M/mrpDFbqNzfbv+xh5uxZJP/f9FnpmcmNLNeOn3p5ENsa994Psxyrtui41q1z4tZb18vDvpcmucmT+Y+CwKRT86Z0ADi4gWIbzk222iCHwyLimyyIGEUFV1Bz0Do6Mc4rd6N0rFj7kWaT0tPv+f7jSY8WT4K3eJ0+MIAj8gFI6FHSDGJ2j1UHJ5dxhWMA/XTkhBGBmssezTuCywXcWJcQVbhYTP6zkzvNakb5qJOzccmIu6szrIDY9LWiYt7nswx+bx4XgiWyyejVSAEkNIm74uqptywee2AooSo4gW6wTYc/ii/+tOlnm7+50DTT36Hm4C1j24fDUgIIkoGl0dG1T1FRDXtfdQu2Oj3bjqLs3IcOK+a0Odjt85v4frlsDJuPL7K98olkOivuRCL4a6735SBj/csJVIgHEkZorruTLVm80mXYLcjiW64YXmiMukEGGAeb8wHPaXuwVjn3+28N2iJOYeL3hSrVo11MBwAF2Ho+/4HRLGiv07HJ9Vpq/+vsttsZJi4xpXb8F3Zs697rDdujUc6fLCm1Kb/AKWCTJI6ZPQQB4t7fHzEZc8yBA69P/b5yeOFh7PFvdzdf3rAx0LLdkH0iuIngmTphPhH4joef5hJdrtD5cxWTGreMjqUO3XoIdMVwDvKIWdo43I68BPCewBkSs2WUP4kn9OYdUupJ70A=="
   }
  ],
  "carteras": {
+  "andres-coppola": {
+   "archivo": "data/andres-coppola.bin",
+   "v": "0fad52daeaa2"
+  },
+  "diego-matkovich": {
+   "archivo": "data/diego-matkovich.bin",
+   "v": "5295e571686b"
+  },
+  "federico-bello": {
+   "archivo": "data/federico-bello.bin",
+   "v": "5521b8f00b53"
+  },
+  "matias-plada": {
+   "archivo": "data/matias-plada.bin",
+   "v": "ef2c8d3d0e38"
+  },
+  "marcelo-scarpa": {
+   "archivo": "data/marcelo-scarpa.bin",
+   "v": "daff63e1773c"
+  },
   "pablo-villasante": {
    "archivo": "data/pablo-villasante.bin",
-   "v": "753355afd183"
+   "v": "c465ba95e835"
   }
  }
 }
